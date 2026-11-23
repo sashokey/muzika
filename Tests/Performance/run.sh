@@ -44,7 +44,7 @@ for file in source.rglob("*.swift"):
 PY
 
 files=()
-while IFS= read -r -d "" file; do files+=("$file"); done < <(rg --files -0 -g '*.swift' "$scratch")
+while IFS= read -r -d "" file; do files+=("$file"); done < <(find "$scratch" -type f -name '*.swift' -print0)
 xcrun swiftc -O -parse-as-library -swift-version 6 -target arm64-apple-macosx27.0 \
     -Xfrontend -disable-sandbox -module-cache-path "${MUZIKA_PERFORMANCE_MODULE_CACHE:-$scratch/module-cache}" \
     "$root/Tests/Performance/PerformanceProbe.swift" "${files[@]}" -o "$scratch/MuzikaPerformance"
