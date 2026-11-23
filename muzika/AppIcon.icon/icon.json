@@ -1,0 +1,31 @@
+{
+  "fill": {
+    "automatic-gradient": "display-p3:0.23529,0.39216,0.92941,1.00000"
+  },
+  "groups": [
+    {
+      "layers": [
+        {
+          "blend-mode": "normal",
+          "glass": true,
+          "image-name": "Waveform.png",
+          "name": "Waveform"
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.30
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": true,
+        "value": 0.35
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": [
+      "macOS"
+    ]
+  }
+}

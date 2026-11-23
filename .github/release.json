@@ -1,0 +1,6 @@
+{
+  "version": "v1",
+  "draft": false,
+  "prerelease": false,
+  "notes": "First release for Apple silicon Macs running macOS 27 or later.\n\n- Offline music library with search, folders, sorting, and filters.\n- Playback queue, shuffle, repeat, gapless playback, and listening history.\n- Synchronized lyrics and an audio-reactive Now Playing background.\n- macOS media controls and automatic interface localization.\n\nThe app archive is ad-hoc signed."
+}
