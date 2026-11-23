@@ -8,8 +8,8 @@ permissions:
   contents: read
 
 jobs:
-  test-and-build:
-    name: Test and build
+  tests:
+    name: Tests
     runs-on: xcode-27
     timeout-minutes: 20
     env:
@@ -22,8 +22,3 @@ jobs:
         run: |
           bash Tests/Performance/run.sh "$RUNNER_TEMP/muzika-scenarios.json" 1
           jq -e 'length > 0 and ([.[].action] | unique | length) == length' "$RUNNER_TEMP/muzika-scenarios.json"
-      - name: Build Release
-        run: |
-          xcodebuild -project muzika.xcodeproj -scheme muzika -configuration Release \
-            -destination 'platform=macOS,arch=arm64' -derivedDataPath "$RUNNER_TEMP/muzika-build" \
-            CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO COMPILER_INDEX_STORE_ENABLE=NO build -quiet

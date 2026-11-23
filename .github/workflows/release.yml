@@ -1,9 +1,6 @@
 name: Release
 
 on:
-  push:
-    branches: [master]
-    paths: [.github/release.json]
   workflow_dispatch:
 
 permissions:
