@@ -10,7 +10,7 @@ struct PlayerCapsule: View {
         if let track = state.playback.current {
             HStack(spacing: 12) {
                 TransportControls(playback: state.playback, compact: true)
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: 4) {
                     Button(action: state.showPlayer) {
                         HStack(spacing: 8) {
                             PlayingCover(library: state.library, track: track, maxPixels: 96)
@@ -25,7 +25,7 @@ struct PlayerCapsule: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .liquidGlassHover()
+                    .liquidGlassHover(outset: CGSize(width: 3, height: 3))
                     .help("Open Now Playing")
                     .accessibilityLabel("Open Now Playing, \(track.title)")
                     Scrubber(playback: state.playback, duration: track.duration, editingTime: $editingTime)
@@ -42,7 +42,7 @@ struct PlayerCapsule: View {
                 }
             }
             .padding(.horizontal, 13)
-            .padding(.vertical, 7)
+            .padding(.vertical, 5.5)
             .frame(maxWidth: 760)
             .glassEffect(.regular.interactive(), in: .capsule)
             .onChange(of: state.playback.currentEntryID) { _, _ in editingTime = nil }
@@ -73,15 +73,22 @@ struct PlayerVolumeButton: View {
 }
 
 struct PlayerIcon: View {
+    static let size = CGSize(width: 27, height: 28)
+
     let title: LocalizedStringResource
     let symbol: String
     let highlighted: Bool
+    let hoverScale: CGFloat
     let action: () -> Void
 
-    init(_ title: LocalizedStringResource, symbol: String, highlighted: Bool = false, action: @escaping () -> Void) {
+    init(
+        _ title: LocalizedStringResource, symbol: String, highlighted: Bool = false, hoverScale: CGFloat = 1,
+        action: @escaping () -> Void
+    ) {
         self.title = title
         self.symbol = symbol
         self.highlighted = highlighted
+        self.hoverScale = hoverScale
         self.action = action
     }
 
@@ -89,12 +96,12 @@ struct PlayerIcon: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 15, weight: .semibold))
-                .frame(minWidth: 27, minHeight: 28)
+                .frame(minWidth: Self.size.width, minHeight: Self.size.height)
                 .foregroundStyle(highlighted ? Color.accentColor : Color.primary)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .liquidGlassHover(in: Circle())
+        .liquidGlassHover(in: Circle(), scale: hoverScale)
         .accessibilityLabel(title)
         .help(title)
         .accessibilityAddTraits(highlighted ? .isSelected : [])
@@ -106,15 +113,16 @@ struct TransportControls: View {
     let compact: Bool
 
     var body: some View {
+        let primaryScale: CGFloat = compact ? 1.15 : 1.45
         HStack(spacing: compact ? 4 : 20) {
             PlayerIcon("Shuffle", symbol: "shuffle", highlighted: playback.shuffle) { playback.shuffle.toggle() }
             if !compact { Spacer(minLength: 0) }
-            PlayerIcon("Previous", symbol: "backward.fill", action: playback.previous)
+            PlayerIcon("Previous", symbol: "backward.fill", hoverScale: primaryScale, action: playback.previous)
             if !compact { Spacer(minLength: 0) }
             PlayerIcon(playback.playing ? "Pause" : "Play", symbol: playback.playing ? "pause.fill" : "play.fill", action: playback.togglePlayback)
-                .scaleEffect(compact ? 1.15 : 1.45)
+                .scaleEffect(primaryScale)
             if !compact { Spacer(minLength: 0) }
-            PlayerIcon("Next", symbol: "forward.fill", action: playback.next)
+            PlayerIcon("Next", symbol: "forward.fill", hoverScale: primaryScale, action: playback.next)
             if !compact { Spacer(minLength: 0) }
             PlayerIcon(
                 repeatLabel, symbol: playback.repeatMode == .one ? "repeat.1" : "repeat",

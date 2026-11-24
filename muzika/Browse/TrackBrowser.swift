@@ -394,7 +394,7 @@ struct BrowseTrackRows: View {
                 BrowseTrackRow(library: library, track: track)
             }
             .buttonStyle(.plain)
-            .liquidGlassHover()
+            .liquidGlassHover(outset: BrowseTrackRow.hoverOutset)
             .modifier(ArtworkPlaybackModifier(
                 library: library, target: .track(track, queue: tracks), playback: playback,
                 compact: true, effectsTrack: showsPlaybackEffects ? track : nil, beforePlay: beforePlay
@@ -414,6 +414,8 @@ struct BrowseTrackRows: View {
 
 @MainActor
 struct BrowseTrackRow: View {
+    static let hoverOutset = CGSize(width: 6, height: 1)
+
     let library: LibraryStore
     let track: AudioTrack
 
@@ -474,7 +476,7 @@ struct BrowseSongGrid: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .liquidGlassHover()
+                .liquidGlassHover(outset: BrowseArtwork.cardHoverOutset)
                 .modifier(ArtworkPlaybackModifier(
                     library: library, target: .track(track, queue: tracks), playback: playback,
                     compact: false, effectsTrack: showsPlaybackEffects ? track : nil, beforePlay: beforePlay
@@ -759,6 +761,7 @@ struct FolderBrowserPage: View {
             }
             .padding(.bottom, 12)
         }
+        .browseHoverGutter()
     }
 
     private func belongs(_ file: URL, to folder: URL) -> Bool {

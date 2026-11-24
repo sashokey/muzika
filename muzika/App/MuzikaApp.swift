@@ -199,7 +199,9 @@ private struct WindowTitlebar: NSViewRepresentable {
 
     final class TitlebarView: NSView {
         var showsTitle = true {
-            didSet { if showsTitle != oldValue { accessory.isHidden = !showsTitle } }
+            didSet {
+                if let window, showsTitle != oldValue { updateAccessory(in: window) }
+            }
         }
 
         private let accessory: NSTitlebarAccessoryViewController = {
@@ -245,10 +247,16 @@ private struct WindowTitlebar: NSViewRepresentable {
             guard let window else { return }
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
-            if !window.titlebarAccessoryViewControllers.contains(accessory) {
-                window.addTitlebarAccessoryViewController(accessory)
+            updateAccessory(in: window)
+        }
+
+        private func updateAccessory(in window: NSWindow) {
+            let index = window.titlebarAccessoryViewControllers.firstIndex(of: accessory)
+            if showsTitle {
+                if index == nil { window.addTitlebarAccessoryViewController(accessory) }
+            } else if let index {
+                window.removeTitlebarAccessoryViewController(at: index)
             }
-            accessory.isHidden = !showsTitle
         }
     }
 }

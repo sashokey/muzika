@@ -413,6 +413,8 @@ enum AlbumCompleteness: String, CaseIterable {
 
 @MainActor
 struct BrowseArtwork: View {
+    static let cardHoverOutset = CGSize(width: 4, height: 3)
+
     let library: LibraryStore
     let track: AudioTrack?
     var symbol = "music.note"
@@ -507,6 +509,12 @@ struct BrowseHeading<Actions: View>: View {
 }
 
 extension View {
+    func browseHoverGutter(_ edges: Edge.Set = .horizontal) -> some View {
+        let gutter: CGFloat = 7
+        return contentMargins(edges, gutter, for: .scrollContent)
+            .padding(edges, -gutter)
+    }
+
     func browseGlassHeader<Header: View>(@ViewBuilder _ header: () -> Header) -> some View {
         modifier(BrowseGlassHeader(header: header()))
     }

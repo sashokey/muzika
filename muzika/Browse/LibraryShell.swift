@@ -74,7 +74,10 @@ struct LibraryShell<Player: View, Settings: View>: View {
     private func sidebarRow(_ destination: LibraryRoute) -> some View {
         Label(destination.title, systemImage: destination.symbol)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .liquidGlassHover()
+            .liquidGlassHover(
+                outset: CGSize(width: 6, height: 4),
+                selectionTint: route.sidebarRoute == destination
+            )
             .tag(destination)
     }
 
@@ -343,7 +346,6 @@ private struct RecentlyAddedPage: View {
                 }
                 .buttonStyle(.plain)
                 .liquidGlassHover()
-                Divider()
             }
         }
         .padding(.bottom, 9)
@@ -375,6 +377,7 @@ struct GroupBrowserPage: View {
                     Group {
                         if route == .albums {
                             BrowseGroupGrid(groups: groups, library: library, playback: playback, open: navigate)
+                                .padding(.top, 12)
                         } else {
                             BrowseGroupList(
                                 groups: groups, library: library, playback: playback, open: navigate,
@@ -491,7 +494,7 @@ struct BrowseGroupList: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .liquidGlassHover()
+                .liquidGlassHover(outset: BrowseTrackRow.hoverOutset)
                 .modifier(ArtworkPlaybackModifier(
                     library: library, target: .group(group.tracks), playback: playback, compact: true
                 ))
@@ -537,7 +540,7 @@ struct BrowseGroupGrid: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .liquidGlassHover()
+                .liquidGlassHover(outset: BrowseArtwork.cardHoverOutset)
                 .accessibilityLabel(group.title)
                 .accessibilityHint(group.subtitle)
                 .modifier(ArtworkPlaybackModifier(

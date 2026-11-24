@@ -6,17 +6,22 @@ enum GlassHoverMotion {
 }
 
 extension View {
-    func liquidGlassHover() -> some View {
-        liquidGlassHover(in: RoundedRectangle(cornerRadius: 8))
+    func liquidGlassHover(outset: CGSize = CGSize(width: 1, height: 1), selectionTint: Bool = false) -> some View {
+        modifier(LiquidGlassHover(outline: RoundedRectangle(cornerRadius: 8), outset: outset, selectionTint: selectionTint))
     }
 
-    func liquidGlassHover<Outline: InsettableShape>(in outline: Outline) -> some View {
-        modifier(LiquidGlassHover(outline: outline))
+    func liquidGlassHover<Outline: InsettableShape>(
+        in outline: Outline, outset: CGSize = CGSize(width: 1, height: 1), scale: CGFloat = 1
+    ) -> some View {
+        modifier(LiquidGlassHover(outline: outline, outset: outset, scale: scale))
     }
 }
 
 private struct LiquidGlassHover<Outline: InsettableShape>: ViewModifier {
     let outline: Outline
+    var outset = CGSize(width: 1, height: 1)
+    var selectionTint = false
+    var scale: CGFloat = 1
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -29,13 +34,10 @@ private struct LiquidGlassHover<Outline: InsettableShape>: ViewModifier {
                 ZStack {
                     if visible {
                         material
-                            .overlay {
-                                outline.strokeBorder(.primary.opacity(0.12), lineWidth: 0.5)
-                            }
-                            .padding(-1)
-                            .transition(
-                                reduceMotion ? .identity : .scale(scale: GlassHoverMotion.initialScale).combined(with: .opacity)
-                            )
+                            .padding(.horizontal, -outset.width)
+                            .padding(.vertical, -outset.height)
+                            .scaleEffect(scale)
+                            .transition(appearance)
                     }
                 }
                 .animation(reduceMotion ? nil : GlassHoverMotion.appearance, value: visible)
@@ -47,10 +49,43 @@ private struct LiquidGlassHover<Outline: InsettableShape>: ViewModifier {
 
     @ViewBuilder
     private var material: some View {
-        if reduceTransparency {
-            outline.fill(.primary.opacity(0.12))
+        if selectionTint {
+            outline.fill(.white.opacity(0.07))
         } else {
-            Color.clear.glassEffect(.regular, in: outline)
+            ZStack {
+                if reduceTransparency {
+                    outline.fill(.primary.opacity(0.12))
+                } else {
+                    Color.clear.glassEffect(.regular, in: outline)
+                }
+            }
+            .overlay {
+                outline.strokeBorder(.primary.opacity(0.12), lineWidth: 0.5)
+            }
+        }
+    }
+
+    private var appearance: AnyTransition {
+        if reduceMotion { return .identity }
+        if selectionTint { return .opacity }
+        return .modifier(active: GlassHoverReveal(progress: 0), identity: GlassHoverReveal(progress: 1))
+    }
+}
+
+private struct GlassHoverReveal: ViewModifier, Animatable {
+    nonisolated var progress: Double
+
+    nonisolated var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        let progress = progress
+        return content.visualEffect { effect, geometry in
+            let span = max(1, geometry.size.width, geometry.size.height)
+            let shrink = min(1 - GlassHoverMotion.initialScale, 2 / span)
+            return effect.scaleEffect(1 - shrink * CGFloat(1 - progress)).opacity(progress)
         }
     }
 }

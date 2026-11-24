@@ -231,20 +231,13 @@ struct LyricsPanel: View {
             timed: document.isTimed, singing: singing, deEmphasized: deEmphasized,
             soften: deEmphasized && blur && !reduceMotion && contrast != .increased, reduceMotion: reduceMotion
         )
-        .equatable()
         if let start = line.start {
-            Button {
+            LyricButton(text: text) {
                 seek(max(0, start + (offset.isFinite ? offset : 0)))
                 recenter()
-            } label: {
-                text.contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .liquidGlassHover()
-            .accessibilityAddTraits(singing ? .isSelected : [])
-            .accessibilityHint(line.isBackground ? "Backing vocals. Seeks to this line." : "Seeks to this line.")
         } else {
-            text.textSelection(.enabled)
+            text.equatable().textSelection(.enabled)
         }
     }
 
@@ -259,6 +252,28 @@ struct LyricsPanel: View {
         return latest
     }
 
+    private struct LyricButton: View {
+        let text: LyricText
+        let action: () -> Void
+        @State private var hovered = false
+
+        var body: some View {
+            Button(action: action) {
+                label.equatable().contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .onHover { hovered = $0 }
+            .accessibilityAddTraits(text.singing ? .isSelected : [])
+            .accessibilityHint(text.line.isBackground ? "Backing vocals. Seeks to this line." : "Seeks to this line.")
+        }
+
+        private var label: LyricText {
+            var label = text
+            label.hovered = hovered
+            return label
+        }
+    }
+
     private struct LyricText: View, Equatable {
         let line: LyricsLine
         let layout: Layout
@@ -268,9 +283,11 @@ struct LyricsPanel: View {
         let deEmphasized: Bool
         let soften: Bool
         let reduceMotion: Bool
+        var hovered = false
 
         var body: some View {
             let emphasisAnimation: Animation? = reduceMotion ? nil : .easeInOut(duration: 0.24)
+            let opacity = deEmphasized ? (hovered ? 0.72 : 0.5) : 1
             VStack(alignment: .leading, spacing: layout.auxiliarySpacing) {
                 if let pronunciation = line.pronunciation {
                     highlighted(pronunciation, words: line.pronunciationWords)
@@ -281,7 +298,7 @@ struct LyricsPanel: View {
                     .font(.system(size: layout.textSize * (line.isBackground ? 0.86 : 1), weight: timed ? .semibold : .medium))
                     .foregroundStyle(.primary)
                     .animation(emphasisAnimation) { text in
-                        text.opacity(deEmphasized ? 0.5 : 1)
+                        text.opacity(opacity)
                     }
                 if let translation = line.translation {
                     highlighted(translation, words: line.translationWords)

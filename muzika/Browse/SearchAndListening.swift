@@ -77,17 +77,16 @@ struct LibrarySearchPage: View {
                     .focused($focused)
                     .onSubmit { rememberQuery() }
                     .accessibilityLabel("Search Library")
-                    .liquidGlassHover()
                 if !query.isEmpty {
                     Button("Clear Search", systemImage: "xmark.circle.fill") { query = "" }
                         .labelStyle(.iconOnly)
                         .buttonStyle(.borderless)
                         .help("Clear Search")
-                        .liquidGlassHover(in: .circle)
                 }
             }
             .padding(8)
             .background(.quaternary.opacity(0.55), in: .rect(cornerRadius: 8))
+            .liquidGlassHover()
             Picker("Search Scope", selection: $scope) {
                 ForEach(BrowseSearchScope.allCases) { item in
                     Text(item.displayTitle).tag(item)
@@ -105,6 +104,7 @@ struct LibrarySearchPage: View {
                     }
                     .padding(.bottom, 16)
                 }
+                .browseHoverGutter()
                 if scope == .lyrics && searchingLyrics { lyricsProgress }
             } else if scope == .lyrics {
                 if searchingLyrics { lyricsProgress }
@@ -254,6 +254,7 @@ struct LibrarySearchPage: View {
                     }
                     .padding(.bottom, 22)
                 }
+                .browseHoverGutter()
             }
         }
     }
@@ -276,6 +277,7 @@ struct LibrarySearchPage: View {
                     beforePlay: recordSong
                 )
             }
+            .browseHoverGutter([.horizontal, .top])
         } else {
             BrowseTrackTable(library: library, tracks: songs, playback: playback, navigate: open, beforePlay: recordSong)
         }
@@ -292,7 +294,7 @@ struct LibrarySearchPage: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.tint)
-                .liquidGlassHover(in: .capsule)
+                .liquidGlassHover(in: .capsule, outset: CGSize(width: 6, height: 3))
             }
         }
     }
@@ -455,6 +457,7 @@ struct ListeningBrowser: View {
                 default: EmptyView()
                 }
             }
+            .browseHoverGutter(route == .home ? .leading : [.horizontal, .top])
         }
         .padding(.horizontal, 26)
     }
@@ -511,7 +514,6 @@ struct ListeningBrowser: View {
                     .liquidGlassHover(in: .capsule)
                     .frame(maxWidth: .infinity)
             }
-            Divider()
             HStack(spacing: 12) {
                 Button("Listening History", systemImage: LibraryRoute.history.symbol) { navigate(.history) }
                     .liquidGlassHover(in: .capsule)
@@ -652,7 +654,7 @@ struct ListeningBrowser: View {
                                     BrowseTrackRow(library: library, track: result.track)
                                 }
                                 .buttonStyle(.plain)
-                                .liquidGlassHover()
+                                .liquidGlassHover(outset: BrowseTrackRow.hoverOutset)
                                 .modifier(ArtworkPlaybackModifier(
                                     library: library, target: .track(result.track, queue: rankedTracks),
                                     playback: playback, compact: true

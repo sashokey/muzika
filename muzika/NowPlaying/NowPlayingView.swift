@@ -139,7 +139,6 @@ struct NowPlayingView: View {
         .overlay(alignment: .topLeading) {
             PlayerIcon("Close Now Playing", symbol: "xmark", action: state.closePlayer)
                 .padding(5)
-                .glassEffect(.regular.interactive(), in: .circle)
                 .padding(.leading, horizontalInset)
                 .padding(.top, topInset)
         }
@@ -182,11 +181,11 @@ struct NowPlayingView: View {
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 16, weight: .semibold))
-                        .padding(8)
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .fixedSize()
+                .frame(width: PlayerIcon.size.width, height: PlayerIcon.size.height)
                 .liquidGlassHover(in: Circle())
                 .help("More")
                 .accessibilityLabel("More")
@@ -212,7 +211,7 @@ struct NowPlayingView: View {
                 Label(track.quality, systemImage: "waveform").lineLimit(1)
             }
             .buttonStyle(.plain)
-            .liquidGlassHover(in: Capsule())
+            .liquidGlassHover(in: Capsule(), outset: CGSize(width: 6, height: 3))
             .help("Audio info")
             .accessibilityLabel("Audio info, \(track.quality)")
             .popover(isPresented: $presentingAudioInfo) {

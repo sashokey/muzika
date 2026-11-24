@@ -62,7 +62,10 @@ struct PreferencesView: View {
                 List(PreferencesPage.allCases, selection: $state.settingsPage) { page in
                     Label(page.title, systemImage: page.symbol)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .liquidGlassHover()
+                        .liquidGlassHover(
+                            outset: CGSize(width: 6, height: 5),
+                            selectionTint: state.settingsPage == page
+                        )
                         .tag(page)
                 }
                 .listStyle(.sidebar)
@@ -82,7 +85,7 @@ struct PreferencesView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .liquidGlassHover()
+                    .liquidGlassHover(outset: CGSize(width: 6, height: 3))
                 }
                 .listStyle(.sidebar)
             }
@@ -102,7 +105,6 @@ struct PreferencesView: View {
                 .onSubmit {
                     if let first = results.first { select(first) }
                 }
-                .liquidGlassHover()
             if !query.isEmpty {
                 Button("Clear search", systemImage: "xmark.circle.fill") {
                     query = ""
@@ -112,11 +114,11 @@ struct PreferencesView: View {
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .liquidGlassHover()
             }
         }
         .padding(8)
         .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 8))
+        .liquidGlassHover()
     }
 
     private func select(_ item: PreferencesItem) {
@@ -147,7 +149,7 @@ struct PreferencesView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(Color.accentColor)
-                .liquidGlassHover()
+                .liquidGlassHover(outset: CGSize(width: 6, height: 4))
             }
             Text(page.title)
                 .font(.largeTitle.bold())
@@ -249,13 +251,13 @@ struct PreferencesView: View {
                         ForEach(CoverStyle.allCases) { style in
                             Text(style.title)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .liquidGlassHover()
                                 .tag(style)
                         }
                     }
                     .labelsHidden()
                     .accessibilityLabel("Cover art")
                     .pickerStyle(.inline)
+                    .liquidGlassHover(outset: CGSize(width: 6, height: 4))
                     .id(PreferencesItem.coverArt)
                 }
                 Section("Listening statistics") {
@@ -398,7 +400,7 @@ private struct LibraryPreferences: View {
                                 .labelStyle(.iconOnly)
                         }
                         .buttonStyle(.borderless)
-                        .liquidGlassHover()
+                        .liquidGlassHover(in: Circle(), outset: CGSize(width: 4, height: 4))
                     }
                 }
                 Button(PreferencesItem.addFolder.title, systemImage: "plus") {
