@@ -215,7 +215,7 @@ private struct LibraryPages<Settings: View>: View {
             TrackBrowserPage(
                 title: route.title, tracks: snapshot?.songs ?? [], library: library, playback: playback,
                 presorted: .title, glassHeader: true, highlightsCellsOnHover: false,
-                allowsRowsBehindHeader: true, usesSongsArtwork: true, navigate: state.navigate
+                usesUniformRows: true, usesSongsArtwork: true, navigate: state.navigate
             )
         case .folders, .folder:
             FolderBrowserPage(

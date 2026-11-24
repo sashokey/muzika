@@ -24,7 +24,6 @@ for file in source.rglob("*.swift"):
     text = file.read_text()
     if file.name == "MuzikaApp.swift":
         text = replace(text, "@main\n", "")
-        text = replace(text, "private struct MainWindow:", "struct MainWindow:")
     elif file.name == "AppState.swift":
         text = replace(text, "let library = LibraryStore()", "let library = LibraryStore(storageURL: BenchmarkPaths.library)")
         text = replace(text, "let history = HistoryStore()", "let history = HistoryStore(file: BenchmarkPaths.history)")
@@ -32,7 +31,7 @@ for file in source.rglob("*.swift"):
         text = replace(text, "    @ObservationIgnored private let system: SystemPlayback\n", "")
         text = replace(text, "        system = SystemPlayback(library: library, playback: playback)\n", "")
         text = replace(text, "        playback.onNowPlayingChange = { [weak system] in system?.update() }\n", "")
-    elif file.name in ["HistoryStore.swift", "Preferences.swift", "SearchAndListening.swift", "TrackBrowser.swift"]:
+    elif file.name in ["HistoryStore.swift", "Preferences.swift", "SearchAndListening.swift", "TrackBrowser.swift", "FolderBrowserPage.swift"]:
         text = text.replace("UserDefaults.standard", "BenchmarkDefaults()")
         text = re.sub(r'@AppStorage\(("[^"\n]+")\)', r'@AppStorage(\1, store: BenchmarkDefaults())', text)
     elif file.name == "WaveBackground.swift":
