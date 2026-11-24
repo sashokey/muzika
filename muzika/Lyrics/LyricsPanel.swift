@@ -70,20 +70,18 @@ struct LyricsPanel: View {
         )
         return ScrollViewReader { reader in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: layout.spacing - layout.topOverflow) {
+                LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(document.lines) { line in
                         if let gap = document.gap(before: line.id), active == .gap(line.id) {
+                            followGuide(for: .gap(line.id))
                             countdown(gap, time: time, remainingSeconds: sample.remainingSeconds)
                                 .frame(height: Layout.countdownHeight)
                                 .padding(.bottom, layout.topOverflow)
-                                .onGeometryChange(for: CGRect.self) { proxy in
-                                    proxy.frame(in: .named(LyricsCoordinates.content))
-                                } action: { frame in
-                                    scrolling.frames[.gap(line.id)] = frame
-                                }
+                                .padding(.bottom, layout.spacing - layout.topOverflow)
                                 .id(Anchor.gap(line.id))
                                 .transition(.opacity.animation(reduceMotion ? nil : .easeInOut(duration: 0.24)))
                         }
+                        if document.isTimed { followGuide(for: .lyric(line.id)) }
                         lyricRow(line, layout: layout, time: time, active: active) {
                             userIsScrolling = false
                             scrollResumeAt = nil
@@ -91,12 +89,7 @@ struct LyricsPanel: View {
                             requestScroll(.lyric(line.id), with: reader, layout: layout, animated: !reduceMotion)
                         }
                         .padding(.bottom, layout.topOverflow)
-                        .onGeometryChange(for: CGRect.self) { proxy in
-                            proxy.frame(in: .named(LyricsCoordinates.content))
-                        } action: { frame in
-                            scrolling.frames[.lyric(line.id)] = frame
-                        }
-                        .onDisappear { scrolling.frames[.lyric(line.id)] = nil }
+                        .padding(.bottom, line.id == document.lines.last?.id ? 0 : layout.spacing - layout.topOverflow)
                         .id(Anchor.lyric(line.id))
                     }
                 }
@@ -130,9 +123,8 @@ struct LyricsPanel: View {
                 guard let anchor = next.anchor else { return }
                 let animate = !reduceMotion && previous.anchor != next.anchor
                 let removedGap: CGFloat
-                if animate, case let .lyric(id) = anchor, previous.anchor == .gap(id),
-                   let frame = scrolling.frames[.gap(id)] {
-                    removedGap = frame.height + layout.spacing - layout.topOverflow
+                if animate, case let .lyric(id) = anchor, previous.anchor == .gap(id) {
+                    removedGap = Layout.countdownHeight + layout.spacing
                 } else {
                     removedGap = 0
                 }
@@ -160,8 +152,26 @@ struct LyricsPanel: View {
         _ anchor: Anchor, with reader: ScrollViewProxy, layout: Layout, animated: Bool, removedGap: CGFloat = 0
     ) {
         scrolling.move(to: anchor, inset: layout.followTopInset, animated: animated, removedGap: removedGap) {
-            reader.scrollTo(anchor, anchor: .top)
+            let fraction = layout.followTopInset / max(1, layout.height)
+            reader.scrollTo(FollowGuideID(anchor: anchor), anchor: UnitPoint(x: 0, y: fraction))
         }
+    }
+
+    private struct FollowGuideID: Hashable {
+        let anchor: Anchor
+    }
+
+    private func followGuide(for anchor: Anchor) -> some View {
+        Color.clear.frame(height: 0)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.frame(in: .named(LyricsCoordinates.content)).minY
+            } action: { position in
+                scrolling.record(position, for: anchor)
+            }
+            .onDisappear { scrolling.positions[anchor] = nil }
+            .id(FollowGuideID(anchor: anchor))
     }
 
     private func countdown(_ gap: LyricsGap, time: Double, remainingSeconds: Double?) -> some View {
@@ -376,7 +386,7 @@ struct LyricsPanel: View {
 
 @MainActor
 private final class LyricsScrolling: NSObject {
-    var frames: [LyricsPanel.Anchor: CGRect] = [:]
+    var positions: [LyricsPanel.Anchor: CGFloat] = [:]
     private(set) weak var scrollView: NSScrollView?
     private var motion: Motion?
     private var displayLink: CADisplayLink?
@@ -389,6 +399,15 @@ private final class LyricsScrolling: NSObject {
         let requestedAt = CACurrentMediaTime()
         var revealedAt: Double?
         var start: (position: CGFloat, time: Double)?
+    }
+
+    func record(_ position: CGFloat, for anchor: LyricsPanel.Anchor) {
+        positions[anchor] = position
+        guard let motion, motion.target == anchor, let revealedAt = motion.revealedAt else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.motion?.revealedAt == revealedAt else { return }
+            self.advance(at: CACurrentMediaTime())
+        }
     }
 
     func attach(to scrollView: NSScrollView?) {
@@ -426,7 +445,7 @@ private final class LyricsScrolling: NSObject {
 
     private func advance(at time: Double) {
         guard var motion, let scrollView else { return }
-        guard let frame = frames[motion.target] else {
+        guard let target = positions[motion.target] else {
             if let revealedAt = motion.revealedAt {
                 if time - revealedAt >= 0.24 { cancel() }
             } else {
@@ -439,7 +458,7 @@ private final class LyricsScrolling: NSObject {
 
         let clip = scrollView.contentView
         let origin = clip.bounds.origin
-        let requestedPosition = frame.minY - origin.y
+        let requestedPosition = target - origin.y
         let position = motion.start?.position ?? requestedPosition
         let startedAt = motion.start?.time ?? min(time, motion.requestedAt)
         let duration = 0.24
@@ -447,7 +466,7 @@ private final class LyricsScrolling: NSObject {
         let progress = animate ? min(1, max(0, (time - startedAt) / duration)) : 1
         let fraction = progress * progress * (3 - 2 * progress)
         let visualY = position + (motion.inset - position) * fraction
-        scroll(scrollView, to: frame.minY - visualY)
+        scroll(scrollView, to: target - visualY)
         if progress == 1 {
             cancel()
         } else {
