@@ -487,6 +487,7 @@ struct BrowseHeading<Actions: View>: View {
                 Button("Back", systemImage: "chevron.left", action: back)
                     .labelStyle(.iconOnly)
                     .help("Back")
+                    .liquidGlassHover(in: .circle)
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)

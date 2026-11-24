@@ -73,6 +73,8 @@ struct LibraryShell<Player: View, Settings: View>: View {
 
     private func sidebarRow(_ destination: LibraryRoute) -> some View {
         Label(destination.title, systemImage: destination.symbol)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .liquidGlassHover()
             .tag(destination)
     }
 
@@ -294,6 +296,7 @@ private struct RecentlyAddedPage: View {
             VStack(spacing: 0) {
                 BrowseHeading(title: String(localized: "Library")) {
                     Button("Add Folder", systemImage: "folder.badge.plus", action: addFolder)
+                        .liquidGlassHover(in: .capsule)
                         .disabled(library.isScanning)
                 }
                 status
@@ -339,6 +342,7 @@ private struct RecentlyAddedPage: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .liquidGlassHover()
                 Divider()
             }
         }
@@ -394,6 +398,7 @@ struct GroupBrowserPage: View {
                             }
                         }
                     }
+                    .liquidGlassHover(in: .capsule)
                 }
                 Menu("Sort", systemImage: "arrow.up.arrow.down") {
                     Picker("Sort", selection: $arrangement) {
@@ -402,6 +407,7 @@ struct GroupBrowserPage: View {
                         }
                     }
                 }
+                .liquidGlassHover(in: .capsule)
             }
             .padding(.horizontal, 26)
         }
@@ -485,6 +491,7 @@ struct BrowseGroupList: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .liquidGlassHover()
                 .modifier(ArtworkPlaybackModifier(
                     library: library, target: .group(group.tracks), playback: playback, compact: true
                 ))
@@ -530,6 +537,7 @@ struct BrowseGroupGrid: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .liquidGlassHover()
                 .accessibilityLabel(group.title)
                 .accessibilityHint(group.subtitle)
                 .modifier(ArtworkPlaybackModifier(

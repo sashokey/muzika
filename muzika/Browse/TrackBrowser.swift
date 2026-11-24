@@ -114,6 +114,7 @@ struct TrackBrowserPage: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .fixedSize()
+                .liquidGlassHover(in: .capsule)
             }
             if let artwork {
                 HStack(alignment: .bottom, spacing: 14) {
@@ -174,6 +175,7 @@ private struct BrowseTrackSortMenu: View {
             Divider()
             Toggle("Reverse Order", isOn: $descending)
         }
+        .liquidGlassHover(in: .capsule)
     }
 }
 
@@ -205,6 +207,7 @@ private struct BrowseTrackFiltersMenu: View {
             Button("Reset") { filters = .init() }
                 .disabled(filters == .init())
         }
+        .liquidGlassHover(in: .capsule)
     }
 }
 
@@ -217,8 +220,10 @@ struct BrowsePlaybackButtons: View {
         HStack(spacing: 10) {
             Button("Play", systemImage: "play.fill") { playback.play(tracks, shuffled: false) }
                 .buttonStyle(.borderedProminent)
+                .liquidGlassHover(in: .capsule)
             Button("Shuffle", systemImage: "shuffle") { playback.play(tracks, shuffled: true) }
                 .buttonStyle(.bordered)
+                .liquidGlassHover(in: .capsule)
         }
         .disabled(tracks.isEmpty)
     }
@@ -252,26 +257,36 @@ struct BrowseTrackTable: View {
                         }
                     Text(track.title).lineLimit(1)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .liquidGlassHover()
             }
             .width(min: 105, ideal: 164)
 
             TableColumn(BrowseSort.artist.displayTitle, sortUsing: TrackSortOrder(key: .artist)) { track in
                 Text(artistDisplayName(track.artist)).lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .liquidGlassHover()
             }
             .width(min: 67, ideal: 107)
 
             TableColumn(BrowseSort.album.displayTitle, sortUsing: TrackSortOrder(key: .album)) { track in
                 Text(albumDisplayName(track.album)).lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .liquidGlassHover()
             }
             .width(min: 67, ideal: 112)
 
             TableColumn(BrowseSort.quality.displayTitle, sortUsing: TrackSortOrder(key: .quality)) { track in
                 Text((preferences?.audioQuality ?? .fileFormat).value(for: track)).lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .liquidGlassHover()
             }
             .width(min: 53, ideal: 78)
 
             TableColumn(BrowseSort.duration.displayTitle, sortUsing: TrackSortOrder(key: .duration)) { track in
                 Text(timeLabel(track.duration)).monospacedDigit()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .liquidGlassHover()
             }
             .width(min: 62, ideal: 69, max: 86)
         }
@@ -379,6 +394,7 @@ struct BrowseTrackRows: View {
                 BrowseTrackRow(library: library, track: track)
             }
             .buttonStyle(.plain)
+            .liquidGlassHover()
             .modifier(ArtworkPlaybackModifier(
                 library: library, target: .track(track, queue: tracks), playback: playback,
                 compact: true, effectsTrack: showsPlaybackEffects ? track : nil, beforePlay: beforePlay
@@ -458,6 +474,7 @@ struct BrowseSongGrid: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .liquidGlassHover()
                 .modifier(ArtworkPlaybackModifier(
                     library: library, target: .track(track, queue: tracks), playback: playback,
                     compact: false, effectsTrack: showsPlaybackEffects ? track : nil, beforePlay: beforePlay
@@ -606,12 +623,13 @@ private struct ArtworkPlaybackControl: View {
             .focused($focused)
             .accessibilityLabel(Text(title))
             .opacity(showsControl ? 1 : 0)
+            .scaleEffect(reduceMotion || showsControl ? 1 : GlassHoverMotion.initialScale)
             .allowsHitTesting(showsControl)
             .accessibilityHidden(!showsControl)
         }
         .onHover { isHovered = $0 }
         .onScrollVisibilityChange(threshold: 0.2) { visible = $0 }
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: showsControl)
+        .animation(reduceMotion ? nil : GlassHoverMotion.appearance, value: showsControl)
     }
 }
 
@@ -682,9 +700,11 @@ struct FolderBrowserPage: View {
                         Menu("Folder Order", systemImage: "folder") {
                             Toggle("Ascending by Name", isOn: $sortByName)
                         }
+                        .liquidGlassHover(in: .capsule)
                     }
                     if folder == nil {
                         Button("Add Folder", systemImage: "folder.badge.plus", action: addFolder)
+                            .liquidGlassHover(in: .capsule)
                             .disabled(library.isScanning)
                     }
                 }
@@ -726,6 +746,7 @@ struct FolderBrowserPage: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .liquidGlassHover()
                     .contextMenu {
                         Button("Open", systemImage: "arrow.right") { navigate(.folder(item.url)) }
                         if !item.tracks.isEmpty {

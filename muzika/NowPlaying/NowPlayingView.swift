@@ -187,6 +187,7 @@ struct NowPlayingView: View {
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .fixedSize()
+                .liquidGlassHover(in: Circle())
                 .help("More")
                 .accessibilityLabel("More")
             }
@@ -211,6 +212,7 @@ struct NowPlayingView: View {
                 Label(track.quality, systemImage: "waveform").lineLimit(1)
             }
             .buttonStyle(.plain)
+            .liquidGlassHover(in: Capsule())
             .help("Audio info")
             .accessibilityLabel("Audio info, \(track.quality)")
             .popover(isPresented: $presentingAudioInfo) {
@@ -223,6 +225,7 @@ struct NowPlayingView: View {
                         presentingAudioInfo = false
                         state.showingInfo = true
                     }
+                    .liquidGlassHover()
                 }
                 .padding(15)
                 .frame(minWidth: 180)
@@ -339,6 +342,7 @@ private struct QueuePanel: View {
                                 queueLabel(entry.track)
                             }
                             .buttonStyle(.plain)
+                            .liquidGlassHover()
                             .contextMenu {
                                 Button("Play") { playback.select(entry) }
                                 Button("Move up") { move(entry, delta: -1) }

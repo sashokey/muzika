@@ -25,6 +25,7 @@ struct PlayerCapsule: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .liquidGlassHover()
                     .help("Open Now Playing")
                     .accessibilityLabel("Open Now Playing, \(track.title)")
                     Scrubber(playback: state.playback, duration: track.duration, editingTime: $editingTime)
@@ -93,6 +94,7 @@ struct PlayerIcon: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .liquidGlassHover(in: Circle())
         .accessibilityLabel(title)
         .help(title)
         .accessibilityAddTraits(highlighted ? .isSelected : [])
@@ -157,6 +159,7 @@ struct Scrubber: View {
             }
         }
         .labelsHidden()
+        .liquidGlassHover(in: Capsule())
         .accessibilityValue(elapsedLabel(editingTime ?? playback.position))
     }
 }
@@ -222,6 +225,7 @@ struct VolumeControl: View {
                 Text("Volume")
             }
             .labelsHidden()
+            .liquidGlassHover(in: Capsule())
             .accessibilityValue(state.playback.volume.formatted(.percent))
             Image(systemName: "speaker.wave.3.fill").accessibilityHidden(true)
         }

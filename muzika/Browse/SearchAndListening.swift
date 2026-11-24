@@ -57,6 +57,7 @@ struct LibrarySearchPage: View {
             BrowseHeading(title: LibraryRoute.search.title) {
                 if scope == .lyrics {
                     Button("Refresh lyrics search", systemImage: "arrow.clockwise", action: refreshLyrics)
+                        .liquidGlassHover(in: .capsule)
                 }
                 if !terms.isEmpty {
                     Picker("Result View", selection: $resultsAsGrid) {
@@ -66,6 +67,7 @@ struct LibrarySearchPage: View {
                     .pickerStyle(.segmented)
                     .labelsHidden()
                     .fixedSize()
+                    .liquidGlassHover(in: .capsule)
                 }
             }
             HStack(spacing: 8) {
@@ -75,11 +77,13 @@ struct LibrarySearchPage: View {
                     .focused($focused)
                     .onSubmit { rememberQuery() }
                     .accessibilityLabel("Search Library")
+                    .liquidGlassHover()
                 if !query.isEmpty {
                     Button("Clear Search", systemImage: "xmark.circle.fill") { query = "" }
                         .labelStyle(.iconOnly)
                         .buttonStyle(.borderless)
                         .help("Clear Search")
+                        .liquidGlassHover(in: .circle)
                 }
             }
             .padding(8)
@@ -91,6 +95,7 @@ struct LibrarySearchPage: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
+            .liquidGlassHover(in: .capsule)
             .padding(.vertical, 12)
 
             if terms.isEmpty {
@@ -157,6 +162,7 @@ struct LibrarySearchPage: View {
                     recentData = Data()
                     recentDestinationsData = Data()
                 }
+                .liquidGlassHover(in: .capsule)
             }
             .padding(.vertical, 9)
 
@@ -174,6 +180,7 @@ struct LibrarySearchPage: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .liquidGlassHover()
                 Divider()
             }
             if !destinations.isEmpty {
@@ -195,6 +202,7 @@ struct LibrarySearchPage: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .liquidGlassHover()
                     Divider()
                 }
             }
@@ -284,6 +292,7 @@ struct LibrarySearchPage: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.tint)
+                .liquidGlassHover(in: .capsule)
             }
         }
     }
@@ -433,6 +442,7 @@ struct ListeningBrowser: View {
                     }
                     .labelsHidden()
                     .fixedSize()
+                    .liquidGlassHover(in: .capsule)
                 }
             }
 
@@ -465,6 +475,7 @@ struct ListeningBrowser: View {
                         Spacer()
                         Button("Listening Statistics", systemImage: "chevron.right") { navigate(.statistics) }
                             .controlSize(.small)
+                            .liquidGlassHover(in: .capsule)
                     }
                     BrowseSongGrid(
                         library: library, tracks: recent, playback: playback, displayAlbum: true, limit: 6,
@@ -479,7 +490,9 @@ struct ListeningBrowser: View {
                     HStack {
                         Text("Recently Added").font(.title2.bold()).accessibilityAddTraits(.isHeader)
                         Spacer()
-                        Button("See All") { navigate(.recentlyAdded) }.controlSize(.small)
+                        Button("See All") { navigate(.recentlyAdded) }
+                            .controlSize(.small)
+                            .liquidGlassHover(in: .capsule)
                     }
                     BrowseGroupGrid(groups: Array(latest.prefix(6)), library: library, playback: playback, open: navigate)
                 }
@@ -495,15 +508,19 @@ struct ListeningBrowser: View {
                 )
                 .padding(.vertical, 12)
                 Button("Browse Library", systemImage: "music.note.list") { navigate(.recentlyAdded) }
+                    .liquidGlassHover(in: .capsule)
                     .frame(maxWidth: .infinity)
             }
             Divider()
             HStack(spacing: 12) {
                 Button("Listening History", systemImage: LibraryRoute.history.symbol) { navigate(.history) }
+                    .liquidGlassHover(in: .capsule)
                 if recent.isEmpty {
                     Button("Listening Statistics", systemImage: LibraryRoute.statistics.symbol) { navigate(.statistics) }
+                        .liquidGlassHover(in: .capsule)
                 }
                 Button("Listening Rewind", systemImage: LibraryRoute.rewind.symbol) { navigate(.rewind) }
+                    .liquidGlassHover(in: .capsule)
                 Spacer()
             }
         }
@@ -529,6 +546,7 @@ struct ListeningBrowser: View {
                 }
             }
             .buttonStyle(.borderedProminent)
+            .liquidGlassHover(in: .capsule)
         }
         .padding(12)
         .background(.quaternary.opacity(0.7), in: .rect(cornerRadius: 10))
@@ -575,6 +593,7 @@ struct ListeningBrowser: View {
                             eventRow(event)
                         }
                         .buttonStyle(.plain)
+                        .liquidGlassHover()
                         .contextMenu {
                             PlayTracksMenu(tracks: [track], playback: playback)
                         }
@@ -633,6 +652,7 @@ struct ListeningBrowser: View {
                                     BrowseTrackRow(library: library, track: result.track)
                                 }
                                 .buttonStyle(.plain)
+                                .liquidGlassHover()
                                 .modifier(ArtworkPlaybackModifier(
                                     library: library, target: .track(result.track, queue: rankedTracks),
                                     playback: playback, compact: true

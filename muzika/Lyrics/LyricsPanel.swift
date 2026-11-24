@@ -240,6 +240,7 @@ struct LyricsPanel: View {
                 text.contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .liquidGlassHover()
             .accessibilityAddTraits(singing ? .isSelected : [])
             .accessibilityHint(line.isBackground ? "Backing vocals. Seeks to this line." : "Seeks to this line.")
         } else {

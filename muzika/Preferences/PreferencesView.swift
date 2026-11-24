@@ -61,6 +61,8 @@ struct PreferencesView: View {
             if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 List(PreferencesPage.allCases, selection: $state.settingsPage) { page in
                     Label(page.title, systemImage: page.symbol)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .liquidGlassHover()
                         .tag(page)
                 }
                 .listStyle(.sidebar)
@@ -80,6 +82,7 @@ struct PreferencesView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .liquidGlassHover()
                 }
                 .listStyle(.sidebar)
             }
@@ -99,6 +102,7 @@ struct PreferencesView: View {
                 .onSubmit {
                     if let first = results.first { select(first) }
                 }
+                .liquidGlassHover()
             if !query.isEmpty {
                 Button("Clear search", systemImage: "xmark.circle.fill") {
                     query = ""
@@ -108,6 +112,7 @@ struct PreferencesView: View {
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
+                .liquidGlassHover()
             }
         }
         .padding(8)
@@ -142,6 +147,7 @@ struct PreferencesView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(Color.accentColor)
+                .liquidGlassHover()
             }
             Text(page.title)
                 .font(.largeTitle.bold())
@@ -175,8 +181,10 @@ struct PreferencesView: View {
             Form {
                 Section("Effects") {
                     Toggle(PreferencesItem.heroAnimations.title, isOn: $preferences.heroAnimations)
+                        .liquidGlassHover()
                         .id(PreferencesItem.heroAnimations)
                     Toggle(PreferencesItem.blurEffects.title, isOn: $preferences.forceBlur)
+                        .liquidGlassHover()
                         .id(PreferencesItem.blurEffects)
                 }
                 Section("Layout") {
@@ -184,16 +192,19 @@ struct PreferencesView: View {
                         Text("Smaller").tag(false)
                         Text("Larger").tag(true)
                     }
+                    .liquidGlassHover()
                     .id(PreferencesItem.interfaceSize)
                     Picker(PreferencesItem.historyView.title, selection: $preferences.historyGrid) {
                         Text("List").tag(false)
                         Text("Grid").tag(true)
                     }
+                    .liquidGlassHover()
                     .id(PreferencesItem.historyView)
                     Toggle(PreferencesItem.continueListening.title, isOn: $history.continueListening)
                         .onChange(of: history.continueListening) { _, value in
                             UserDefaults.standard.set(value, forKey: "appearance.continueListening")
                         }
+                        .liquidGlassHover()
                         .id(PreferencesItem.continueListening)
                 }
             }
@@ -202,12 +213,14 @@ struct PreferencesView: View {
             Form {
                 Section("Volume and transitions") {
                     Toggle(PreferencesItem.loudVolume.title, isOn: $preferences.confirmLoudVolume)
+                        .liquidGlassHover()
                         .id(PreferencesItem.loudVolume)
                     LabeledContent(PreferencesItem.loudVolumeThreshold.title) {
                         Slider(value: $preferences.loudVolumeLevel, in: 0.4...0.95, step: 0.05) {
                             Text(PreferencesItem.loudVolumeThreshold.title)
                         }
                         .frame(maxWidth: 175)
+                        .liquidGlassHover()
                         Text(preferences.loudVolumeLevel, format: .percent.precision(.fractionLength(0)))
                             .monospacedDigit()
                             .frame(minWidth: 38)
@@ -215,21 +228,30 @@ struct PreferencesView: View {
                     .disabled(!preferences.confirmLoudVolume)
                     .id(PreferencesItem.loudVolumeThreshold)
                     Toggle(PreferencesItem.gapless.title, isOn: $playback.gapless)
+                        .liquidGlassHover()
                         .id(PreferencesItem.gapless)
                     Toggle(PreferencesItem.spatialAudio.title, isOn: $playback.spatialAudio)
                         .help("Uses Spatial Audio when supported by your audio output.")
                         .accessibilityHint("Uses Spatial Audio when supported by your audio output.")
+                        .liquidGlassHover()
                         .id(PreferencesItem.spatialAudio)
                 }
                 Section("Queue") {
                     Toggle(PreferencesItem.noDuplicates.title, isOn: $playback.preventDuplicates)
+                        .liquidGlassHover()
                         .id(PreferencesItem.noDuplicates)
                     Toggle(PreferencesItem.lockQueue.title, isOn: $playback.queueLocked)
+                        .liquidGlassHover()
                         .id(PreferencesItem.lockQueue)
                 }
                 Section("Cover art") {
                     Picker(PreferencesItem.coverArt.title, selection: $preferences.coverStyle) {
-                        ForEach(CoverStyle.allCases) { style in Text(style.title).tag(style) }
+                        ForEach(CoverStyle.allCases) { style in
+                            Text(style.title)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .liquidGlassHover()
+                                .tag(style)
+                        }
                     }
                     .labelsHidden()
                     .accessibilityLabel("Cover art")
@@ -238,6 +260,7 @@ struct PreferencesView: View {
                 }
                 Section("Listening statistics") {
                     Button(PreferencesItem.listeningStatistics.title) { state.navigate(.statistics) }
+                        .liquidGlassHover()
                         .id(PreferencesItem.listeningStatistics)
                 }
             }
@@ -250,14 +273,17 @@ struct PreferencesView: View {
                             Text("Lyrics text size")
                         }
                         .frame(maxWidth: 175)
+                        .liquidGlassHover()
                         Text(preferences.lyricsSize, format: .percent.precision(.fractionLength(0)))
                             .monospacedDigit()
                             .frame(minWidth: 46)
                         Button("Reset") { preferences.lyricsSize = 1 }
+                            .liquidGlassHover()
                             .disabled(preferences.lyricsSize == 1)
                     }
                     .id(PreferencesItem.lyricsSize)
                     Toggle(PreferencesItem.lyricsBlur.title, isOn: $preferences.lyricsBlur)
+                        .liquidGlassHover()
                         .id(PreferencesItem.lyricsBlur)
                 }
                 Section("Lyrics timing") {
@@ -266,10 +292,12 @@ struct PreferencesView: View {
                             Text("Lyrics timing")
                         }
                         .frame(maxWidth: 175)
+                        .liquidGlassHover()
                         Text(timingLabel(preferences.lyricsOffset))
                             .monospacedDigit()
                             .frame(minWidth: 82)
                         Button("Reset") { preferences.lyricsOffset = 0 }
+                            .liquidGlassHover()
                             .disabled(preferences.lyricsOffset == 0)
                     }
                     .id(PreferencesItem.lyricsTiming)
@@ -332,20 +360,24 @@ private struct LibraryPreferences: View {
                 Picker(PreferencesItem.defaultView.title, selection: $preferences.defaultView) {
                     ForEach(LibraryDefaultView.allCases) { view in Text(view.title).tag(view) }
                 }
+                .liquidGlassHover()
                 .id(PreferencesItem.defaultView)
                 Picker(PreferencesItem.audioQuality.title, selection: $preferences.audioQuality) {
                     ForEach(QualityDisplay.allCases) { style in Text(style.title).tag(style) }
                 }
+                .liquidGlassHover()
                 .id(PreferencesItem.audioQuality)
                 Picker(PreferencesItem.songTap.title, selection: $preferences.songTap) {
                     ForEach(SongTap.allCases) { action in Text(action.title).tag(action) }
                 }
+                .liquidGlassHover()
                 .id(PreferencesItem.songTap)
             }
             Section("Scan Settings") {
                 Picker(PreferencesItem.autoScan.title, selection: $preferences.autoScan) {
                     ForEach(AutoScan.allCases) { policy in Text(policy.title).tag(policy) }
                 }
+                .liquidGlassHover()
                 .id(PreferencesItem.autoScan)
             }
             Section("Folders") {
@@ -366,11 +398,13 @@ private struct LibraryPreferences: View {
                                 .labelStyle(.iconOnly)
                         }
                         .buttonStyle(.borderless)
+                        .liquidGlassHover()
                     }
                 }
                 Button(PreferencesItem.addFolder.title, systemImage: "plus") {
                     state.chooseFiles(folder: true, appendSource: true)
                 }
+                .liquidGlassHover()
                 .id(PreferencesItem.addFolder)
             }
             Section("Scan Status") {
@@ -400,7 +434,9 @@ private struct LibraryPreferences: View {
                                 library.pauseScan()
                             }
                         }
+                        .liquidGlassHover()
                         Button("Cancel") { library.cancelScan() }
+                            .liquidGlassHover()
                     }
                 }
                 if let error = library.scanError {
@@ -412,6 +448,7 @@ private struct LibraryPreferences: View {
                         .monospacedDigit()
                     Button("Show") { showingIssues = true }
                         .accessibilityLabel("Show unreadable files")
+                        .liquidGlassHover()
                         .disabled(library.scanIssues.isEmpty)
                 }
                 .id(PreferencesItem.unreadableFiles)
@@ -419,14 +456,18 @@ private struct LibraryPreferences: View {
             Section("Actions") {
                 Group {
                     Button(PreferencesItem.scanLibrary.title) { Task { await state.scan() } }
+                        .liquidGlassHover()
                         .id(PreferencesItem.scanLibrary)
                     Button(PreferencesItem.forceScan.title) { Task { await state.scan(force: true) } }
+                        .liquidGlassHover()
                         .id(PreferencesItem.forceScan)
                     Button(PreferencesItem.cleanupMissing.title) { Task { await library.cleanupMissingFiles() } }
+                        .liquidGlassHover()
                         .id(PreferencesItem.cleanupMissing)
                 }
                 .disabled(library.sources.isEmpty || library.isScanning)
                 Button(PreferencesItem.clearLibrary.title, role: .destructive) { confirmingClear = true }
+                    .liquidGlassHover()
                     .disabled(!library.hasIndexedTracks)
                     .id(PreferencesItem.clearLibrary)
             }
@@ -462,6 +503,7 @@ private struct LibraryPreferences: View {
                 }
                 Button("Done") { showingIssues = false }
                     .keyboardShortcut(.defaultAction)
+                    .liquidGlassHover()
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .padding(20)
@@ -483,6 +525,7 @@ private struct CachePreferences: View {
                 .id(PreferencesItem.coverCache)
                 LabeledContent("Images", value: library.artworkCacheCount.formatted())
                 Button("Clear", role: .destructive) { confirmingClear = true }
+                    .liquidGlassHover()
                     .disabled(library.artworkCacheCount == 0)
                     .id(PreferencesItem.clearCache)
             }
@@ -500,6 +543,7 @@ private struct LicenseDisclosure: View {
 
     var body: some View {
         Button(PreferencesItem.license.title) { showingLicense = true }
+            .liquidGlassHover()
             .sheet(isPresented: $showingLicense) {
                 VStack(alignment: .trailing, spacing: 12) {
                     ScrollView {
@@ -510,6 +554,7 @@ private struct LicenseDisclosure: View {
                     }
                     Button("Done") { showingLicense = false }
                         .keyboardShortcut(.defaultAction)
+                        .liquidGlassHover()
                 }
                 .padding(20)
                 .frame(minWidth: 560, idealWidth: 650, minHeight: 400, idealHeight: 540)
