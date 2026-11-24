@@ -18,6 +18,7 @@ Fix these items when the user explicitly asks. Remove each item after verifying 
 - In **Now Playing**, remove the hover effect from the seek bar between the artist information and the time readouts.
 - Remove the hover effect from the **Volume** slider as well.
 - In the bottom mini-player, remove the hover highlight around the playback seek bar.
+- Profile stutters when switching sections and low frame rates in the lyrics view. Identify and fix the root causes. Where the implementation approach is already optimal, profile it to find targeted optimizations. Keep the app lightweight and responsive, with smooth section transitions and lyrics updates even on the lowest-spec supported devices. Preserve the existing visual design throughout. Verify both scenarios on the lowest-spec supported hardware available and compare their appearance before and after.
 
 ## Naming, Versioning, and Distribution
 
