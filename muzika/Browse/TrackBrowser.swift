@@ -34,6 +34,7 @@ struct TrackBrowserPage: View {
     let relatedAlbums: [BrowseGroup]
     let presorted: BrowseSort?
     let glassHeader: Bool
+    let highlightsCellsOnHover: Bool
     let navigate: ((LibraryRoute) -> Void)?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -54,6 +55,7 @@ struct TrackBrowserPage: View {
         relatedAlbums: [BrowseGroup] = [],
         presorted: BrowseSort? = nil,
         glassHeader: Bool = true,
+        highlightsCellsOnHover: Bool = true,
         navigate: ((LibraryRoute) -> Void)? = nil
     ) {
         self.title = title
@@ -66,6 +68,7 @@ struct TrackBrowserPage: View {
         self.relatedAlbums = relatedAlbums
         self.presorted = presorted
         self.glassHeader = glassHeader
+        self.highlightsCellsOnHover = highlightsCellsOnHover
         self.navigate = navigate
         self._sort = State(initialValue: TrackSortOrder(key: order))
     }
@@ -95,7 +98,9 @@ struct TrackBrowserPage: View {
             }
         }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: onlyAlbums)
-        .windowLibraryFilter(text: $query, prompt: onlyAlbums ? "Filter Albums" : "Filter Songs")
+        .windowLibraryFilter(
+            text: $query, prompt: onlyAlbums ? "Filter Albums" : "Filter Songs", usesCompactHeight: !onlyAlbums
+        )
     }
 
     private func header(onlyAlbums: Bool, selectedTracks: [AudioTrack]) -> some View {
@@ -124,6 +129,7 @@ struct TrackBrowserPage: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
+                .padding(.bottom, onlyAlbums ? 12 : 0)
             }
             if !onlyAlbums, !selectedTracks.isEmpty {
                 BrowsePlaybackButtons(tracks: selectedTracks, playback: playback)
@@ -142,6 +148,7 @@ struct TrackBrowserPage: View {
         } else {
             ScrollView {
                 BrowseGroupGrid(groups: albums, library: library, playback: playback, open: navigate)
+                    .padding(.top, 12)
                     .padding(.horizontal, 26)
                     .padding(.bottom, 22)
             }
@@ -156,7 +163,10 @@ struct TrackBrowserPage: View {
                 symbol: tracks.isEmpty ? "music.note" : "magnifyingglass"
             )
         } else {
-            BrowseTrackTable(library: library, tracks: selectedTracks, playback: playback, sorting: $sort, navigate: navigate)
+            BrowseTrackTable(
+                library: library, tracks: selectedTracks, playback: playback, sorting: $sort,
+                highlightsCellsOnHover: highlightsCellsOnHover, navigate: navigate
+            )
         }
     }
 }
@@ -233,6 +243,7 @@ struct BrowseTrackTable: View {
     let tracks: [AudioTrack]
     let playback: PlaybackController
     var sorting: Binding<TrackSortOrder>? = nil
+    var highlightsCellsOnHover = true
     var navigate: ((LibraryRoute) -> Void)? = nil
     var beforePlay: (AudioTrack) -> Void = { _ in }
 
@@ -245,7 +256,7 @@ struct BrowseTrackTable: View {
         let rows = sorting == nil ? ownSorting?.sorted(tracks) ?? tracks : tracks
         Table(rows, selection: $selection, sortOrder: headerSorting) {
             TableColumn(BrowseSort.title.displayTitle, sortUsing: TrackSortOrder(key: .title)) { track in
-                HStack(spacing: 7) {
+                trackCell(HStack(spacing: 7) {
                     BrowseArtwork(library: library, track: track, pixelSize: 64)
                         .frame(width: 22, height: 22)
                         .overlay {
@@ -254,37 +265,27 @@ struct BrowseTrackTable: View {
                             }
                         }
                     Text(track.title).lineLimit(1)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .liquidGlassHover()
+                })
             }
             .width(min: 105, ideal: 164)
 
             TableColumn(BrowseSort.artist.displayTitle, sortUsing: TrackSortOrder(key: .artist)) { track in
-                Text(artistDisplayName(track.artist)).lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .liquidGlassHover()
+                trackCell(Text(artistDisplayName(track.artist)).lineLimit(1))
             }
             .width(min: 67, ideal: 107)
 
             TableColumn(BrowseSort.album.displayTitle, sortUsing: TrackSortOrder(key: .album)) { track in
-                Text(albumDisplayName(track.album)).lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .liquidGlassHover()
+                trackCell(Text(albumDisplayName(track.album)).lineLimit(1))
             }
             .width(min: 67, ideal: 112)
 
             TableColumn(BrowseSort.quality.displayTitle, sortUsing: TrackSortOrder(key: .quality)) { track in
-                Text((preferences?.audioQuality ?? .fileFormat).value(for: track)).lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .liquidGlassHover()
+                trackCell(Text((preferences?.audioQuality ?? .fileFormat).value(for: track)).lineLimit(1))
             }
             .width(min: 53, ideal: 78)
 
             TableColumn(BrowseSort.duration.displayTitle, sortUsing: TrackSortOrder(key: .duration)) { track in
-                Text(timeLabel(track.duration)).monospacedDigit()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .liquidGlassHover()
+                trackCell(Text(timeLabel(track.duration)).monospacedDigit())
             }
             .width(min: 62, ideal: 69, max: 86)
         }
@@ -316,6 +317,16 @@ struct BrowseTrackTable: View {
         }
         .onChange(of: rows.map(\.id)) { _, ids in selection.formIntersection(ids) }
         .sheet(item: $details) { TrackInfoView(library: library, track: $0) }
+    }
+
+    @ViewBuilder
+    private func trackCell<Content: View>(_ content: Content) -> some View {
+        let cell = content.frame(maxWidth: .infinity, alignment: .leading)
+        if highlightsCellsOnHover {
+            cell.liquidGlassHover()
+        } else {
+            cell
+        }
     }
 
     private var headerSorting: Binding<[TrackSortOrder]> {

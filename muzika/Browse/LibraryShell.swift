@@ -119,7 +119,7 @@ struct LibraryShell<Player: View, Settings: View>: View {
         case .songs:
             TrackBrowserPage(
                 title: route.title, tracks: groupIndex.songs(in: library), library: library, playback: playback,
-                presorted: .title, glassHeader: true, navigate: navigate
+                presorted: .title, glassHeader: true, highlightsCellsOnHover: false, navigate: navigate
             )
         case .folders, .folder:
             FolderBrowserPage(

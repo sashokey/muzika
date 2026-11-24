@@ -1,6 +1,6 @@
 {
-  "version": "v4",
+  "version": "v5",
   "draft": false,
   "prerelease": false,
-  "notes": "- Fixed a jump to the top of the Lyrics pane when the next synchronized line's layout arrives late.\n- Translated the repository's maintenance and testing guide into English.\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
+  "notes": "- Removed unwanted hover highlights from Songs table cells, both playback position sliders, and the Volume slider.\n- Improved spacing around Filter Songs and between the artist's Albums header and the first album.\n- Extended Up Next highlights across the full width of queue rows and aligned the spacing around artwork.\n- Fixed a false playback error at the end of some MP3 files and preserved the final decoded audio.\n- Documented the scenarios and measurements for investigating interface performance.\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
 }

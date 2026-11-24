@@ -176,7 +176,6 @@ struct Scrubber: View {
             }
         }
         .labelsHidden()
-        .liquidGlassHover(in: Capsule())
         .accessibilityValue(elapsedLabel(editingTime ?? playback.position))
     }
 }
@@ -242,7 +241,6 @@ struct VolumeControl: View {
                 Text("Volume")
             }
             .labelsHidden()
-            .liquidGlassHover(in: Capsule())
             .accessibilityValue(state.playback.volume.formatted(.percent))
             Image(systemName: "speaker.wave.3.fill").accessibilityHidden(true)
         }

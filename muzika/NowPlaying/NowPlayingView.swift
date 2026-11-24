@@ -309,10 +309,12 @@ struct NowPlayingView: View {
 private struct QueuePanel: View {
     @Bindable var playback: PlaybackController
     let library: LibraryStore
+    @Environment(\.layoutDirection) private var layoutDirection
     @ScaledMetric(relativeTo: .caption) private var headerHeight = 28.0
 
     var body: some View {
         let upcoming = visibleQueue
+        let leftToRight = layoutDirection == .leftToRight
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text("Up Next")
@@ -339,9 +341,13 @@ private struct QueuePanel: View {
                                 playback.select(entry)
                             } label: {
                                 queueLabel(entry.track)
+                                    .padding(.horizontal, 4)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .liquidGlassHover()
+                            .liquidGlassHover(outset: CGSize(width: 0, height: 1))
+                            .listRowInsets(.leading, leftToRight ? -8 : -9)
+                            .listRowInsets(.trailing, leftToRight ? -9 : -8)
                             .contextMenu {
                                 Button("Play") { playback.select(entry) }
                                 Button("Move up") { move(entry, delta: -1) }

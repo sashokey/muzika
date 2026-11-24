@@ -1,4 +1,5 @@
 import AVFAudio
+import AudioToolbox
 import Foundation
 
 nonisolated enum PCMStreamFormat {
@@ -27,10 +28,27 @@ nonisolated struct PCMChunk: @unchecked Sendable {
     let buffer: AVAudioPCMBuffer
 }
 
+private extension AVAudioFile {
+    nonisolated func readPCMUntilEnd(into buffer: AVAudioPCMBuffer, frameCount: AVAudioFrameCount) throws -> Bool {
+        let position = framePosition
+        buffer.frameLength = 0
+        do {
+            try read(into: buffer, frameCount: frameCount)
+            return buffer.frameLength == 0
+        } catch let error as NSError where error.domain == NSOSStatusErrorDomain
+            && error.code == Int(kAudioFileEndOfFileError)
+            && position > 0
+            && length - position <= Int64(fileFormat.streamDescription.pointee.mFramesPerPacket) {
+            return true
+        }
+    }
+}
+
 private nonisolated final class PCMConverterInput: @unchecked Sendable {
     let file: AVAudioFile
     var buffer: AVAudioPCMBuffer?
     var error: (any Error)?
+    private var ended = false
 
     init(file: AVAudioFile) {
         self.file = file
@@ -38,7 +56,7 @@ private nonisolated final class PCMConverterInput: @unchecked Sendable {
 
     func next(_ packets: AVAudioPacketCount, status: UnsafeMutablePointer<AVAudioConverterInputStatus>) -> AVAudioBuffer? {
         let remaining = max(0, file.length - file.framePosition)
-        guard remaining > 0, error == nil, packets > 0 else {
+        guard !ended, remaining > 0, error == nil, packets > 0 else {
             status.pointee = .endOfStream
             return nil
         }
@@ -52,7 +70,7 @@ private nonisolated final class PCMConverterInput: @unchecked Sendable {
             return nil
         }
         do {
-            try file.read(into: buffer, frameCount: frames)
+            ended = try file.readPCMUntilEnd(into: buffer, frameCount: frames)
             let hasAudio = buffer.frameLength > 0
             status.pointee = hasAudio ? .haveData : .endOfStream
             return hasAudio ? buffer : nil
@@ -113,7 +131,7 @@ actor PCMStream {
             if result == .error { throw PCMStreamError.unsupportedFormat }
             ended = result == .endOfStream
         } else {
-            try file.read(into: buffer, frameCount: frames)
+            ended = try file.readPCMUntilEnd(into: buffer, frameCount: frames)
         }
         guard buffer.frameLength > 0 else {
             ended = true

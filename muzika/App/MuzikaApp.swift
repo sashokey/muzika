@@ -193,6 +193,7 @@ private struct MainWindow: View {
 private struct WindowLibraryFilter {
     let text: Binding<String>
     let prompt: LocalizedStringResource
+    let usesCompactHeight: Bool
 }
 
 private struct WindowLibraryFilterKey: PreferenceKey {
@@ -204,8 +205,13 @@ private struct WindowLibraryFilterKey: PreferenceKey {
 }
 
 extension View {
-    func windowLibraryFilter(text: Binding<String>, prompt: LocalizedStringResource) -> some View {
-        preference(key: WindowLibraryFilterKey.self, value: WindowLibraryFilter(text: text, prompt: prompt))
+    func windowLibraryFilter(
+        text: Binding<String>, prompt: LocalizedStringResource, usesCompactHeight: Bool = false
+    ) -> some View {
+        preference(
+            key: WindowLibraryFilterKey.self,
+            value: WindowLibraryFilter(text: text, prompt: prompt, usesCompactHeight: usesCompactHeight)
+        )
     }
 }
 
@@ -222,6 +228,8 @@ private struct WindowTitlebar: NSViewRepresentable {
     final class TitlebarView: NSView {
         private var showsTitle = true
         private var filter: WindowLibraryFilter?
+        private let filterGlass = NSGlassEffectView()
+        private lazy var filterGlassHeight = filterGlass.heightAnchor.constraint(equalToConstant: 28)
         private lazy var filterField: NSSearchField = {
             let field = NSSearchField()
             field.target = self
@@ -233,10 +241,8 @@ private struct WindowTitlebar: NSViewRepresentable {
         }()
         private lazy var filterAccessory: NSTitlebarAccessoryViewController = {
             let filterWidth: CGFloat = 325
-            let filterHeight: CGFloat = 28
             let leadingInset: CGFloat = 18
-            let glass = NSGlassEffectView()
-            glass.cornerRadius = filterHeight / 2
+            let glass = filterGlass
             glass.effectIsInteractive = true
             glass.translatesAutoresizingMaskIntoConstraints = false
 
@@ -250,7 +256,7 @@ private struct WindowTitlebar: NSViewRepresentable {
                 glass.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: leadingInset),
                 glass.trailingAnchor.constraint(equalTo: container.trailingAnchor),
                 glass.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-                glass.heightAnchor.constraint(equalToConstant: filterHeight),
+                filterGlassHeight,
                 filterField.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 6),
                 filterField.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -6),
                 filterField.centerYAnchor.constraint(equalTo: content.centerYAnchor)
@@ -320,6 +326,9 @@ private struct WindowTitlebar: NSViewRepresentable {
         private func updateAccessories(in window: NSWindow) {
             setAccessory(accessory, visible: showsTitle, in: window)
             if let filter {
+                let height: CGFloat = filter.usesCompactHeight ? 24 : 28
+                filterGlassHeight.constant = height
+                filterGlass.cornerRadius = height / 2
                 let prompt = String(localized: filter.prompt)
                 filterField.placeholderString = prompt
                 filterField.setAccessibilityLabel(prompt)
