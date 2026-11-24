@@ -240,37 +240,67 @@ final class LibraryStore {
     }
 
     func access(_ track: AudioTrack) -> SecurityScopeLease? {
-        for index in sources.indices where sources[index].url.containsFile(atPath: track.url.path) {
-            var source = sources[index]
-            let before = source
-            let lease = source.open()
-            if source != before {
-                sources[index] = source
-                persist()
-            }
-            if let lease, FileManager.default.isReadableFile(atPath: track.url.path), !track.url.needsDownload {
-                return lease
-            }
-        }
-        if let delegated = temporaryFiles[track.id]?.lease,
-           FileManager.default.isReadableFile(atPath: track.url.path), !track.url.needsDownload {
-            return delegated
-        }
-        guard let lease = SecurityScopeLease(url: track.url), !track.url.needsDownload else { return nil }
-        return lease
+        let result = Self.resolveAccess(to: track, sources: sources, temporaryLease: temporaryFiles[track.id]?.lease)
+        applySourceUpdates(result.updates)
+        return result.lease
     }
 
     func artwork(for track: AudioTrack) async -> Data? {
         if let cached = artworkCache.value(for: track.id) { return cached }
-        guard let lease = access(track) else { return nil }
-        defer { withExtendedLifetime(lease) {} }
         let generation = artworkGeneration
-        let artwork = await AudioFileMetadata.artwork(at: track.url)
-        if let artwork, generation == artworkGeneration, !Task.isCancelled {
+        let (artwork, updates) = await Self.readArtwork(
+            for: track, sources: sources, temporaryLease: temporaryFiles[track.id]?.lease
+        )
+        guard !Task.isCancelled else { return nil }
+        applySourceUpdates(updates)
+        if let artwork, generation == artworkGeneration {
             artworkCache.insert(artwork, for: track.id)
             updateArtworkCacheStats()
         }
         return artwork
+    }
+
+    private typealias SourceUpdate = (previous: LibrarySource, current: LibrarySource)
+
+    private nonisolated static func resolveAccess(
+        to track: AudioTrack, sources: [LibrarySource], temporaryLease: SecurityScopeLease?
+    ) -> (lease: SecurityScopeLease?, updates: [SourceUpdate]) {
+        let path = track.url.path
+        var updates: [SourceUpdate] = []
+        for previous in sources where previous.url.containsFile(atPath: path) {
+            var source = previous
+            let lease = source.open()
+            if source != previous { updates.append((previous, source)) }
+            if let lease, FileManager.default.isReadableFile(atPath: path), !track.url.needsDownload {
+                return (lease, updates)
+            }
+        }
+        if let temporaryLease, FileManager.default.isReadableFile(atPath: path), !track.url.needsDownload {
+            return (temporaryLease, updates)
+        }
+        let lease = SecurityScopeLease(url: track.url)
+        return (lease != nil && !track.url.needsDownload ? lease : nil, updates)
+    }
+
+    @concurrent
+    private static func readArtwork(
+        for track: AudioTrack, sources: [LibrarySource], temporaryLease: SecurityScopeLease?
+    ) async -> (Data?, [SourceUpdate]) {
+        guard !Task.isCancelled else { return (nil, []) }
+        let result = resolveAccess(to: track, sources: sources, temporaryLease: temporaryLease)
+        guard let lease = result.lease, !Task.isCancelled else { return (nil, result.updates) }
+        defer { withExtendedLifetime(lease) {} }
+        return (await AudioFileMetadata.artwork(at: track.url), result.updates)
+    }
+
+    private func applySourceUpdates(_ updates: [SourceUpdate]) {
+        var changed = false
+        for update in updates {
+            guard let index = sources.firstIndex(of: update.previous) else { continue }
+            sources[index] = update.current
+            changed = true
+        }
+        if changed { persist() }
     }
 
     func clearArtworkCache() {

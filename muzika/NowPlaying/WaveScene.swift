@@ -32,22 +32,23 @@ struct WaveHeightField {
     }
 
     private struct Coordinate {
-        let flow: Double
-        let bend: Double
+        let sine: Double
+        let cosine: Double
     }
 
     private static let coordinates = (0..<(width * height)).map { index in
         let x = Double(index % width) / Double(width - 1)
         let y = Double(index / width) / Double(height - 1)
-        return Coordinate(
-            flow: x * 5.9 + y * 3.8 + 0.77 * sin(y * 3),
-            bend: x * 3.4 - y * 5.4 + 0.6 * sin(x * 2.2 + y * 2)
-        )
+        let flow = x * 5.9 + y * 3.8 + 0.77 * sin(y * 3)
+        let bend = x * 3.4 - y * 5.4 + 0.6 * sin(x * 2.2 + y * 2) + 1.15
+        return Coordinate(sine: 0.73 * sin(flow) + 0.27 * sin(bend),
+                          cosine: 0.73 * cos(flow) + 0.27 * cos(bend))
     }
 
     private var pressure = SIMD3<Double>.zero
     private var velocity = SIMD3<Double>.zero
     private var phase = 0.0
+    private var elevations = [Double](repeating: 0, count: width * height)
 
     mutating func samples(spectrum: [Float], delta: TimeInterval, crest: SIMD3<Double>, reflection: SIMD3<Double>) -> Surface? {
         let response = 4.5
@@ -78,10 +79,10 @@ struct WaveHeightField {
 
         let amplitude = energy / (0.35 + energy) * 0.225
         let pixelCount = Self.width * Self.height
-        let elevations = Self.coordinates.map { coordinate in
-            let flow = sin(coordinate.flow - phase)
-            let bend = sin(coordinate.bend - phase + 1.15)
-            return amplitude * (flow * 0.73 + bend * 0.27)
+        let sine = sin(phase) * amplitude
+        let cosine = cos(phase) * amplitude
+        for (index, coordinate) in Self.coordinates.enumerated() {
+            elevations[index] = coordinate.sine * cosine - coordinate.cosine * sine
         }
 
         var height = Data(count: pixelCount * 4)

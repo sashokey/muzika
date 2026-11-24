@@ -1,5 +1,4 @@
 import AppKit
-import ImageIO
 import SwiftUI
 
 nonisolated enum LibraryRoute: Hashable, Sendable {
@@ -414,27 +413,49 @@ enum AlbumCompleteness: String, CaseIterable {
 @MainActor
 struct BrowseArtwork: View {
     static let cardHoverOutset = CGSize(width: 4, height: 3)
+    static let defaultCornerRadius: CGFloat = 9
 
     let library: LibraryStore
     let track: AudioTrack?
     var symbol = "music.note"
     var pixelSize = 320
     var circular = false
+    var cornerRadius = Self.defaultCornerRadius
 
-    @State private var image: NSImage?
+    @State private var thumbnail: Thumbnail?
 
-    private static let cache: NSCache<NSString, NSImage> = {
-        let cache = NSCache<NSString, NSImage>()
+    private struct Thumbnail {
+        let trackID: String
+        let image: CGImage
+    }
+
+    private static let cache: NSCache<NSString, CGImage> = {
+        let cache = NSCache<NSString, CGImage>()
         cache.totalCostLimit = 24 * 1024 * 1024
         return cache
     }()
 
+    static func cachedThumbnail(for track: AudioTrack, pixelSize: Int) -> CGImage? {
+        cache.object(forKey: "\(pixelSize):\(track.id)" as NSString)
+    }
+
+    static func loadThumbnail(for track: AudioTrack, in library: LibraryStore, pixelSize: Int) async -> CGImage? {
+        if let cached = cachedThumbnail(for: track, pixelSize: pixelSize) { return cached }
+        guard let data = await library.artwork(for: track), !Task.isCancelled,
+              let image = await CoverDecoding.image(data, limit: pixelSize), !Task.isCancelled else { return nil }
+        cache.setObject(image, forKey: "\(pixelSize):\(track.id)" as NSString, cost: image.bytesPerRow * image.height)
+        return image
+    }
+
     var body: some View {
+        let currentImage = thumbnail?.trackID == track?.id ? thumbnail?.image : nil
+        let key = track.map { "\(pixelSize):\($0.id)" }
+        let outline = RoundedRectangle(cornerRadius: circular ? 512 : cornerRadius)
         Color(nsColor: .controlBackgroundColor)
             .aspectRatio(1, contentMode: .fit)
             .overlay {
-                if let image {
-                    Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
+                if let currentImage {
+                    Image(decorative: currentImage, scale: 1).resizable().aspectRatio(contentMode: .fill)
                 } else {
                     GeometryReader { proxy in
                         Image(systemName: symbol)
@@ -444,43 +465,25 @@ struct BrowseArtwork: View {
                     }
                 }
             }
-            .clipShape(.rect(cornerRadius: circular ? 512 : 9))
+            .clipShape(outline)
             .overlay {
-                RoundedRectangle(cornerRadius: circular ? 512 : 9)
-                    .strokeBorder(.quaternary, lineWidth: 1)
+                outline.strokeBorder(.quaternary, lineWidth: 1)
             }
             .accessibilityHidden(true)
-            .task(id: track?.id) {
-                image = nil
-                guard let track else { return }
-                let key = "\(pixelSize):\(track.id)" as NSString
-                if let cached = Self.cache.object(forKey: key) {
-                    image = cached
-                    return
-                }
-                guard let data = await library.artwork(for: track), !Task.isCancelled else { return }
-                let size = pixelSize
-                let worker = Task.detached(priority: .utility) {
-                    guard !Task.isCancelled, let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil as CGImage? }
-                    let options = [
-                        kCGImageSourceCreateThumbnailFromImageAlways: true,
-                        kCGImageSourceCreateThumbnailWithTransform: true,
-                        kCGImageSourceThumbnailMaxPixelSize: size
-                    ] as CFDictionary
-                    return CGImageSourceCreateThumbnailAtIndex(source, 0, options)
-                }
-                let thumbnail = await withTaskCancellationHandler {
-                    await worker.value
-                } onCancel: {
-                    worker.cancel()
-                }
-                guard let thumbnail, !Task.isCancelled else { return }
-                let artwork = NSImage(cgImage: thumbnail, size: NSSize(width: thumbnail.width, height: thumbnail.height))
-                Self.cache.setObject(artwork, forKey: key, cost: thumbnail.bytesPerRow * thumbnail.height)
-                image = artwork
+            .task(id: key, priority: .utility) {
+                guard let track, let image = await Self.loadThumbnail(for: track, in: library, pixelSize: pixelSize),
+                      !Task.isCancelled else { return }
+                thumbnail = Thumbnail(trackID: track.id, image: image)
             }
-            .onDisappear { image = nil }
+            .onDisappear { thumbnail = nil }
     }
+}
+
+enum BrowseLayout {
+    static let headerSpacing: CGFloat = 12
+    static let sidebarWidth: CGFloat = 209
+    static let dividerWidth: CGFloat = 1
+    static var detailLeadingInset: CGFloat { sidebarWidth + dividerWidth }
 }
 
 struct BrowseHeading<Actions: View>: View {
@@ -494,7 +497,8 @@ struct BrowseHeading<Actions: View>: View {
             if let back {
                 Button("Back", systemImage: "chevron.left", action: back)
                     .labelStyle(.iconOnly)
-                    .buttonStyle(GlassHoverButtonStyle(iconOnly: true))
+                    .buttonStyle(GlassHoverButtonStyle(iconSymbol: "chevron.backward"))
+                    .accessibilityLabel("Back")
                     .help("Back")
             }
             VStack(alignment: .leading, spacing: 3) {
@@ -510,7 +514,7 @@ struct BrowseHeading<Actions: View>: View {
             actions()
         }
         .padding(.top, 21)
-        .padding(.bottom, 12)
+        .padding(.bottom, BrowseLayout.headerSpacing)
     }
 }
 
@@ -521,23 +525,47 @@ extension View {
             .padding(edges, -gutter)
     }
 
-    func browseGlassHeader<Header: View>(@ViewBuilder _ header: () -> Header) -> some View {
-        modifier(BrowseGlassHeader(header: header()))
+    func browseScrollUnderHeader() -> some View {
+        GeometryReader { geometry in
+            let topInset = geometry.safeAreaInsets.top
+            self.contentMargins(.top, topInset, for: .scrollContent)
+                .contentMargins(.top, topInset, for: .scrollIndicators)
+                .ignoresSafeArea(.container, edges: .top)
+        }
+    }
+
+    func browseGlassHeader<Header: View>(spacing: CGFloat = 0, @ViewBuilder _ header: () -> Header) -> some View {
+        modifier(BrowseGlassHeader(header: header(), spacing: spacing))
     }
 }
 
 private struct BrowseGlassHeader<Header: View>: ViewModifier {
     let header: Header
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    let spacing: CGFloat
 
     func body(content: Content) -> some View {
-        content.safeAreaBar(edge: .top, spacing: 0) {
-            let bar = header.frame(maxWidth: .infinity, alignment: .leading)
-            if reduceTransparency {
-                bar.background(Color(nsColor: .windowBackgroundColor))
-            } else {
-                bar.glassEffect(.regular, in: Rectangle())
+        content
+            .scrollEdgeEffectHidden(true, for: .top)
+            .safeAreaInset(edge: .top, spacing: spacing) {
+                header.frame(maxWidth: .infinity, alignment: .leading)
+                    .background {
+                        BrowseGlassSurface()
+                            .ignoresSafeArea(.container, edges: .top)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
+                    }
             }
+    }
+}
+
+struct BrowseGlassSurface: View {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    var body: some View {
+        if reduceTransparency {
+            Color(nsColor: .windowBackgroundColor)
+        } else {
+            Color.clear.glassEffect(.regular, in: Rectangle())
         }
     }
 }

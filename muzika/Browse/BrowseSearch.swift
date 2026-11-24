@@ -6,6 +6,7 @@ enum BrowseSearch {
     }
 
     static func matches(_ terms: [String], fields: [String]) -> Bool {
+        guard !terms.isEmpty else { return true }
         let fields = fields.map(folded)
         return terms.allSatisfy { term in fields.contains { $0.contains(term) } }
     }

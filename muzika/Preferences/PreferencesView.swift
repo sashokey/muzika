@@ -113,8 +113,7 @@ struct PreferencesView: View {
             }
         }
         .padding(8)
-        .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 8))
-        .liquidGlassHover()
+        .liquidGlassHover(restingFill: .quaternary.opacity(0.5))
     }
 
     private func select(_ item: PreferencesItem) {
@@ -190,13 +189,11 @@ struct PreferencesView: View {
                         Text("Smaller").tag(false)
                         Text("Larger").tag(true)
                     }
-                    .liquidGlassHover()
                     .id(PreferencesItem.interfaceSize)
                     Picker(PreferencesItem.historyView.title, selection: $preferences.historyGrid) {
                         Text("List").tag(false)
                         Text("Grid").tag(true)
                     }
-                    .liquidGlassHover()
                     .id(PreferencesItem.historyView)
                     Toggle(PreferencesItem.continueListening.title, isOn: $history.continueListening)
                         .onChange(of: history.continueListening) { _, value in
@@ -358,24 +355,20 @@ private struct LibraryPreferences: View {
                 Picker(PreferencesItem.defaultView.title, selection: $preferences.defaultView) {
                     ForEach(LibraryDefaultView.allCases) { view in Text(view.title).tag(view) }
                 }
-                .liquidGlassHover()
                 .id(PreferencesItem.defaultView)
                 Picker(PreferencesItem.audioQuality.title, selection: $preferences.audioQuality) {
                     ForEach(QualityDisplay.allCases) { style in Text(style.title).tag(style) }
                 }
-                .liquidGlassHover()
                 .id(PreferencesItem.audioQuality)
                 Picker(PreferencesItem.songTap.title, selection: $preferences.songTap) {
                     ForEach(SongTap.allCases) { action in Text(action.title).tag(action) }
                 }
-                .liquidGlassHover()
                 .id(PreferencesItem.songTap)
             }
             Section("Scan Settings") {
                 Picker(PreferencesItem.autoScan.title, selection: $preferences.autoScan) {
                     ForEach(AutoScan.allCases) { policy in Text(policy.title).tag(policy) }
                 }
-                .liquidGlassHover()
                 .id(PreferencesItem.autoScan)
             }
             Section("Folders") {
@@ -392,11 +385,12 @@ private struct LibraryPreferences: View {
                         Button(role: .destructive) {
                             removing = source
                         } label: {
-                            Label("Remove library folder", systemImage: "minus.circle")
-                                .labelStyle(.iconOnly)
+                            CenteredControlSymbol(name: "minus.circle", size: CGSize(width: 16, height: 16),
+                                                  pointSize: 13, weight: .regular)
                         }
                         .buttonStyle(.borderless)
                         .liquidGlassHover(in: Circle(), outset: CGSize(width: 4, height: 4))
+                        .accessibilityLabel("Remove library folder")
                     }
                 }
                 Button(PreferencesItem.addFolder.title, systemImage: "plus") {

@@ -64,9 +64,9 @@ private final class InstrumentalTransitionCheck: NSObject, NSApplicationDelegate
             LyricsLine(id: 2, text: "Vocal line after the break", start: 10, end: 11),
             LyricsLine(id: 3, text: "Last vocal line", start: 11, end: 12),
         ])
-        func apply(_ time: Double, reduceMotion: Bool = false) {
-            view.configure(TimedLyricsConfiguration(document: document, position: { time }, pausedPosition: time,
-                                                    playing: false, offset: 0, textSize: 1, blur: false,
+        func apply(_ time: Double, reduceMotion: Bool = false, lyrics: LyricsDocument? = nil, playing: Bool = false) {
+            view.configure(TimedLyricsConfiguration(document: lyrics ?? document, position: { time },
+                                                    pausedPosition: playing ? nil : time, playing: playing, offset: 0, textSize: 1, blur: false,
                                                     reduceMotion: reduceMotion, topOverflow: 0, seek: { _ in }))
         }
 
@@ -143,6 +143,140 @@ private final class InstrumentalTransitionCheck: NSObject, NSApplicationDelegate
             try await Task.sleep(for: .milliseconds(330))
             try expect(countdown.superlayer === tiles && countdown.opacity == 1, "Seeking into Instrumental did not restore the countdown")
         }
+
+        let leadIn = LyricsDocument(lines: [
+            LyricsLine(id: 0, text: "First vocal line", start: 1, end: 2),
+            LyricsLine(id: 1, text: "Next vocal line", start: 2, end: 3),
+        ])
+        func rowOpacities() -> [Float] {
+            (tiles.sublayers ?? []).sorted { $0.frame.minY < $1.frame.minY }.compactMap {
+                $0.sublayers?.first?.sublayers?.first?.opacity
+            }
+        }
+        apply(0, reduceMotion: true, lyrics: leadIn)
+        for _ in 0..<40 where rowOpacities().isEmpty {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        try expect(rowOpacities() == [0.5, 0.5], "The first lead-in frame must show both inactive rows dimmed")
+        apply(1, reduceMotion: true, lyrics: leadIn)
+        try expect(rowOpacities() == [1, 0.5], "Only the first row should brighten at its cue")
+
+        for (word, growsLeft) in [("Melody", false), ("מנגינה", true)] {
+            let lyrics = LyricsDocument(lines: [
+                LyricsLine(id: 0, text: word, start: 0, end: 1,
+                           words: [LyricsWord(id: 0, start: 0, end: 1, range: 0..<word.count)]),
+            ])
+            func accentMask() throws -> CAShapeLayer {
+                let block = try require(tiles.sublayers?.first?.sublayers?.first, "Missing timed word block")
+                return try require(block.sublayers?.last?.mask as? CAShapeLayer, "Missing word accent mask")
+            }
+            func accentBounds() throws -> CGRect {
+                try require(accentMask().path?.boundingBox, "Missing word accent geometry")
+            }
+            apply(0.2, lyrics: lyrics)
+            for _ in 0..<40 {
+                if (try? accentBounds()) != nil { break }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            let start = try accentBounds()
+            apply(0.8, lyrics: lyrics)
+            let later = try accentBounds()
+            try expect(start.width > 0 && later.width > start.width, "Accent must grow within the same word")
+            try expect(growsLeft ? later.maxX == start.maxX : later.minX == start.minX,
+                       "Accent starts from the wrong edge")
+            apply(0.3, lyrics: lyrics)
+            let rewound = try accentBounds()
+            try expect(rewound.width < later.width, "Seeking back must restore the word's earlier progress")
+            apply(0.2, reduceMotion: true, lyrics: lyrics)
+            let still = try accentBounds()
+            apply(0.8, reduceMotion: true, lyrics: lyrics)
+            let stillLater = try accentBounds()
+            try expect(stillLater == still && still.width >= later.width,
+                       "Reduce Motion must keep the active word uniformly accented")
+
+            apply(0.25, lyrics: lyrics, playing: true)
+            let mask = try accentMask()
+            if window.isVisible {
+                let sweep = try require(mask.animation(forKey: "lyrics-accent-sweep") as? CAKeyframeAnimation,
+                                        "The compositor did not receive a word sweep")
+                let paths = try require(sweep.values as? [CGPath], "Missing sweep frames")
+                try expect(abs(sweep.duration - 0.75) < 0.001 && (paths.first?.boundingBox.width ?? 0) < still.width,
+                           "Sweep should start at the sampled fraction and finish at the word boundary")
+            }
+            let target = try accentBounds()
+            try expect(target == still, "The sweep target should include the complete word")
+            apply(0.65, lyrics: lyrics, playing: true)
+            if window.isVisible {
+                let sweep = try require(mask.animation(forKey: "lyrics-accent-sweep") as? CAKeyframeAnimation,
+                                        "Seeking did not replace the word sweep")
+                try expect(abs(sweep.duration - 0.35) < 0.001, "Seeking must start the compositor at the new word fraction")
+            }
+            apply(0.5, lyrics: lyrics)
+            try expect(mask.animation(forKey: "lyrics-accent-sweep") == nil, "Pausing must cancel the live sweep")
+        }
+
+        let wrappedWord = String(repeating: "W", count: 42)
+        let wrapped = LyricsDocument(lines: [
+            LyricsLine(id: 0, text: wrappedWord, start: 0, end: 1,
+                       words: [LyricsWord(id: 0, start: 0, end: 1, range: 0..<wrappedWord.count)]),
+        ])
+        func wrappedMask() -> CGPath? {
+            let block = tiles.sublayers?.first?.sublayers?.first
+            return (block?.sublayers?.last?.mask as? CAShapeLayer)?.path
+        }
+        apply(0.25, lyrics: wrapped)
+        for _ in 0..<40 where wrappedMask() == nil {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let firstPart = try require(wrappedMask(), "Missing wrapped accent")
+        apply(0.99, lyrics: wrapped)
+        let almostComplete = try require(wrappedMask(), "Missing wrapped continuation")
+        let lastRow = almostComplete.boundingBox.maxY - 1
+        let spans = stride(from: 3.0, to: almostComplete.boundingBox.maxX, by: 3)
+        let lowerRowAccented = spans.contains { almostComplete.contains(CGPoint(x: $0, y: lastRow)) }
+        let lowerRowTooEarly = spans.contains { firstPart.contains(CGPoint(x: $0, y: lastRow)) }
+        try expect(lowerRowAccented && !lowerRowTooEarly, "A wrapped word must finish its first row before lighting the continuation")
+
+        let phrases = LyricsDocument(lines: (0..<4).map { index in
+            LyricsLine(id: index, text: "Vocal phrase", start: Double(index), end: Double(index + 1))
+        })
+        apply(0.5, reduceMotion: true, lyrics: phrases)
+        for _ in 0..<40 where rowOpacities().count != 4 {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let gradient = rowOpacities()
+        try expect(gradient == [1, 0.5, 0.46, 0.42], "Distant phrases should recede without changing cue selection")
+        let rows = (tiles.sublayers ?? []).sorted { $0.frame.minY < $1.frame.minY }
+        try expect(rows.count == 4, "Missing lyric rows in emphasis check")
+        let ink = try require(rows[1].sublayers?.first, "Missing primary lyric ink")
+        try expect(ink.transform.m11 < 1, "An upcoming line without word timings should be slightly smaller")
+        apply(0.96, lyrics: phrases, playing: true)
+        apply(1.01, lyrics: phrases, playing: true)
+        try expect(ink.transform.m11 == 1, "The active line should grow to its full size")
+        if window.isVisible {
+            let scale = try require(ink.animation(forKey: "lyrics-emphasis-scale") as? CABasicAnimation,
+                                    "The newly active phrase must animate to full size")
+            try expect(number(scale.fromValue) < 1 && number(scale.toValue) == 1,
+                       "The active phrase must start at its previous size")
+            let followingRows = try rows.suffix(2).map {
+                try require($0.animation(forKey: "lyrics-row-stagger") as? CAKeyframeAnimation,
+                            "Subsequent phrases must follow with a stagger")
+            }
+            let peaks = followingRows.map { ($0.values as? [NSNumber])?.dropFirst().first?.doubleValue ?? 0 }
+            try expect(peaks[0] > 0 && peaks[1] > peaks[0],
+                       "The scroll lag should increase with distance from the active phrase")
+            try await Task.sleep(for: .milliseconds(120))
+            let scaleInFlight = try require(ink.presentation()?.transform.m11, "Missing presented line scale")
+            let rowLag = try rows.suffix(2).map {
+                try require($0.presentation()?.transform.m42, "Missing presented row lag")
+            }
+            try expect(scaleInFlight > 0.97 && scaleInFlight < 1, "The line did not appear at an intermediate scale")
+            try expect(rowLag[0] > 0 && rowLag[1] > rowLag[0], "The stagger was not visible in the presented rows")
+        }
+        apply(1.01, reduceMotion: true, lyrics: phrases)
+        try expect(ink.animation(forKey: "lyrics-emphasis-scale") == nil, "Reduce Motion must stop the scale animation")
+        try expect(rows.allSatisfy { $0.animation(forKey: "lyrics-row-stagger") == nil },
+                   "Reduce Motion must stop the scroll stagger")
     }
 
     private func screenY(_ layer: CALayer, tiles: CALayer, view: TimedLyricsScrollView, presented: Bool = false) -> CGFloat {

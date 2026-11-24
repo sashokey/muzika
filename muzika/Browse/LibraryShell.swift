@@ -5,22 +5,29 @@ import SwiftUI
 struct LibraryShell<Player: View, Settings: View>: View {
     let state: AppState
     var playbackArtworkIsVisible = true
+    var titlebarInset: CGFloat = 0
+    let detailWidth: CGFloat
     var onRouteChange: (() -> Void)? = nil
     @ViewBuilder let player: () -> Player
     @ViewBuilder let settings: () -> Settings
 
     var body: some View {
+        let hasPlayer = state.playback.current != nil
+        let footerInset: CGFloat = hasPlayer ? 72 : 0
         HStack(spacing: 0) {
             LibrarySidebar(state: state)
 
             Divider()
+                .frame(width: BrowseLayout.dividerWidth)
                 .ignoresSafeArea(.container, edges: .top)
 
             LibraryPages(state: state, playbackArtworkIsVisible: playbackArtworkIsVisible,
-                         onRouteChange: onRouteChange, settings: settings)
-                .safeAreaPadding(.bottom, state.playback.current == nil ? 0 : 72)
+                         titlebarInset: titlebarInset, onRouteChange: onRouteChange, settings: settings)
+                .frame(width: detailWidth)
+                .contentMargins(.bottom, -footerInset, for: .scrollIndicators)
+                .safeAreaPadding(.bottom, footerInset)
                 .overlay(alignment: .bottom) {
-                    if state.playback.current != nil {
+                    if hasPlayer {
                         player()
                             .padding(.horizontal, 20)
                             .padding(.bottom, 10)
@@ -49,7 +56,15 @@ private struct LibrarySidebar: View {
             item(.settings, selected: selected)
         }
         .listStyle(.sidebar)
-        .frame(width: 209)
+        .scrollContentBackground(.hidden)
+        .scrollEdgeEffectHidden(true, for: .top)
+        .frame(width: BrowseLayout.sidebarWidth)
+        .background {
+            LibrarySidebarBackground()
+                .ignoresSafeArea(.container, edges: .top)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
         .accessibilityLabel("Sidebar")
     }
 
@@ -70,6 +85,17 @@ private struct LibrarySidebar: View {
     }
 }
 
+private struct LibrarySidebarBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .sidebar
+        view.blendingMode = .behindWindow
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {}
+}
+
 private struct LibrarySidebarEntry: View, Equatable {
     let destination: LibraryRoute
     let selected: Bool
@@ -84,6 +110,7 @@ private struct LibrarySidebarEntry: View, Equatable {
 private struct LibraryPages<Settings: View>: View {
     let state: AppState
     let playbackArtworkIsVisible: Bool
+    let titlebarInset: CGFloat
     let onRouteChange: (() -> Void)?
     @ViewBuilder let settings: () -> Settings
 
@@ -115,10 +142,33 @@ private struct LibraryPages<Settings: View>: View {
             .transition(.opacity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay(alignment: .top) {
+            if titlebarInset > 0, !usesGlassHeader(snapshot) {
+                GeometryReader { geometry in
+                    BrowseGlassSurface().frame(width: geometry.size.width, height: titlebarInset)
+                }
+                .ignoresSafeArea(.container, edges: .top)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+            }
+        }
         .animation(!reduceMotion && preferences?.heroAnimations != false ? .easeInOut(duration: 0.14) : nil, value: route)
         .onChange(of: route) { _, _ in onRouteChange?() }
         .task(id: revision) {
             await groupIndex.prepare(library, revision: revision)
+        }
+    }
+
+    private func usesGlassHeader(_ snapshot: LibraryBrowseSnapshot?) -> Bool {
+        switch route {
+        case .home, .recentlyAdded, .artists, .albums, .songs, .genres:
+            snapshot != nil
+        case .folders, .folder:
+            true
+        case .artist, .album, .genre:
+            snapshot?.group(for: route) != nil
+        case .search, .history, .statistics, .rewind, .settings:
+            false
         }
     }
 
@@ -164,7 +214,8 @@ private struct LibraryPages<Settings: View>: View {
         case .songs:
             TrackBrowserPage(
                 title: route.title, tracks: snapshot?.songs ?? [], library: library, playback: playback,
-                presorted: .title, glassHeader: true, highlightsCellsOnHover: false, navigate: state.navigate
+                presorted: .title, glassHeader: true, highlightsCellsOnHover: false,
+                allowsRowsBehindHeader: true, usesSongsArtwork: true, navigate: state.navigate
             )
         case .folders, .folder:
             FolderBrowserPage(
@@ -277,6 +328,8 @@ extension Notification.Name {
 
 @MainActor
 private struct RecentlyAddedPage: View {
+    private static let shortcutVerticalPadding: CGFloat = 9
+
     let library: LibraryStore
     let playback: PlaybackController
     let albums: [BrowseGroup]
@@ -312,9 +365,11 @@ private struct RecentlyAddedPage: View {
                     )
                 }
             }
+            .padding(.top, BrowseLayout.headerSpacing - (query.isEmpty ? Self.shortcutVerticalPadding : 0))
             .padding(.horizontal, 26)
             .padding(.bottom, 24)
         }
+        .browseScrollUnderHeader()
         .browseGlassHeader {
             VStack(spacing: 0) {
                 BrowseHeading(title: String(localized: "Library")) {
@@ -355,13 +410,13 @@ private struct RecentlyAddedPage: View {
                     HStack(spacing: 12) {
                         Image(systemName: destination.symbol)
                             .foregroundStyle(.tint)
-                            .frame(width: 21)
+                            .frame(width: 17, alignment: .leading)
                         Text(destination.title)
                         Spacer()
-                        Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+                        Image(systemName: "chevron.forward").foregroundStyle(.tertiary)
                     }
-                    .padding(.vertical, 9)
-                    .padding(.horizontal, 2)
+                    .padding(.vertical, Self.shortcutVerticalPadding)
+                    .padding(.horizontal, 6)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -397,7 +452,6 @@ struct GroupBrowserPage: View {
                     Group {
                         if route == .albums {
                             BrowseGroupGrid(groups: groups, library: library, playback: playback, open: navigate)
-                                .padding(.top, 12)
                         } else {
                             BrowseGroupList(
                                 groups: groups, library: library, playback: playback, open: navigate,
@@ -405,9 +459,11 @@ struct GroupBrowserPage: View {
                             )
                         }
                     }
+                    .padding(.top, BrowseLayout.headerSpacing - (route == .albums ? 0 : BrowseGroupList.rowVerticalPadding))
                     .padding(.horizontal, 26)
                     .padding(.bottom, 22)
                 }
+                .browseScrollUnderHeader()
             }
         }
         .browseGlassHeader {
@@ -421,7 +477,7 @@ struct GroupBrowserPage: View {
                             }
                         }
                     }
-                    .liquidGlassHover(in: .capsule)
+                    .glassHoverMenu()
                 }
                 Menu("Sort", systemImage: "arrow.up.arrow.down") {
                     Picker("Sort", selection: $arrangement) {
@@ -430,7 +486,7 @@ struct GroupBrowserPage: View {
                         }
                     }
                 }
-                .liquidGlassHover(in: .capsule)
+                .glassHoverMenu()
             }
             .padding(.horizontal, 26)
         }
@@ -457,11 +513,16 @@ struct GroupBrowserPage: View {
 
     private var displayedGroups: [BrowseGroup] {
         let terms = BrowseSearch.terms(query)
-        let unavailable = library.sources.filter { $0.status == .unavailable }
-        let groups = groups.filter { group in
-            guard BrowseSearch.matches(terms, fields: [group.title, group.subtitle]) else { return false }
-            guard let completeness else { return true }
-            return AlbumCompleteness(tracks: group.tracks, unavailable: unavailable) == completeness
+        let groups: [BrowseGroup]
+        if terms.isEmpty, completeness == nil {
+            groups = self.groups
+        } else {
+            let unavailable = completeness == nil ? [] : library.sources.filter { $0.status == .unavailable }
+            groups = self.groups.filter { group in
+                guard BrowseSearch.matches(terms, fields: [group.title, group.subtitle]) else { return false }
+                guard let completeness else { return true }
+                return AlbumCompleteness(tracks: group.tracks, unavailable: unavailable) == completeness
+            }
         }
         switch arrangement {
         case .title: return groups
@@ -487,6 +548,8 @@ struct GroupBrowserPage: View {
 
 @MainActor
 struct BrowseGroupList: View {
+    nonisolated static let rowVerticalPadding: CGFloat = 5
+
     let groups: [BrowseGroup]
     let library: LibraryStore
     let playback: PlaybackController
@@ -494,84 +557,7 @@ struct BrowseGroupList: View {
     var circular = false
 
     var body: some View {
-        LazyVStack(spacing: 0) {
-            ForEach(groups) { group in
-                Button {
-                    open(group.route)
-                } label: {
-                    HStack(spacing: 10) {
-                        BrowseArtwork(
-                            library: library, track: group.artworkTrack, symbol: group.route.symbol,
-                            pixelSize: 96, circular: circular
-                        )
-                        .frame(width: 36, height: 36)
-                        Text(group.title).lineLimit(1)
-                        Spacer()
-                        Text(group.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                        Image(systemName: "chevron.right").foregroundStyle(.tertiary)
-                    }
-                    .padding(.vertical, 5)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .liquidGlassHover(outset: BrowseTrackRow.hoverOutset)
-                .modifier(ArtworkPlaybackModifier(
-                    library: library, target: .group(group.tracks), playback: playback, compact: true
-                ))
-                .contextMenu {
-                    Button("Open", systemImage: "arrow.right") { open(group.route) }
-                    Divider()
-                    PlayTracksMenu(tracks: group.tracks, playback: playback)
-                }
-                Divider().padding(.leading, 46)
-            }
-        }
-    }
-}
-
-@MainActor
-struct BrowseGroupGrid: View {
-    let groups: [BrowseGroup]
-    let library: LibraryStore
-    let playback: PlaybackController
-    let open: (LibraryRoute) -> Void
-    var circular = false
-
-    var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 132, maximum: 208), spacing: 16)], alignment: .leading, spacing: 19) {
-            ForEach(groups) { group in
-                Button {
-                    open(group.route)
-                } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        BrowseArtwork(
-                            library: library, track: group.artworkTrack, symbol: group.route.symbol,
-                            circular: circular
-                        )
-                        Text(group.title)
-                            .fontWeight(.medium)
-                            .lineLimit(1)
-                        Text(group.subtitle)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .liquidGlassHover(outset: BrowseArtwork.cardHoverOutset)
-                .accessibilityLabel(group.title)
-                .accessibilityHint(group.subtitle)
-                .modifier(ArtworkPlaybackModifier(
-                    library: library, target: .group(group.tracks), playback: playback, compact: false
-                ))
-                .contextMenu {
-                    Button("Open", systemImage: "arrow.right") { open(group.route) }
-                    Divider()
-                    PlayTracksMenu(tracks: group.tracks, playback: playback)
-                }
-            }
-        }
+        BrowseGroupGrid(groups: groups, library: library, playback: playback, open: open, circular: circular,
+                        presentation: .list)
     }
 }

@@ -5,8 +5,14 @@ extension EnvironmentValues {
 }
 
 struct ArtworkSpectrumBadge: View {
+    enum Style {
+        case circle
+        case songs
+    }
+
     let playback: PlaybackController
     let diameter: CGFloat
+    var style: Style = .circle
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
@@ -19,20 +25,34 @@ struct ArtworkSpectrumBadge: View {
     var body: some View {
         let animates = playback.playing && effectsVisible && isVisible && !reduceMotion && scenePhase != .background
         let title: LocalizedStringResource = playback.playing ? "Playing" : "Current Song"
-        HStack(spacing: diameter * 0.038) {
-            ForEach(levels.indices, id: \.self) { index in
-                Capsule()
-                    .fill(.white)
-                    .frame(width: diameter * 0.071, height: diameter * 0.58 * levels[index])
+        Group {
+            if style == .songs {
+                bars.shadow(color: .black.opacity(0.9), radius: 1)
+            } else {
+                bars.background(.black.opacity(0.82), in: .circle)
             }
         }
-        .frame(width: diameter, height: diameter)
-        .background(.black.opacity(0.82), in: .circle)
         .allowsHitTesting(false)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(title))
         .onScrollVisibilityChange(threshold: 0.4) { isVisible = $0 }
         .task(id: animates) { await updateLevels(animates: animates) }
+    }
+
+    private var bars: some View {
+        let isSongs = style == .songs
+        return HStack(alignment: isSongs ? .bottom : .center, spacing: diameter * (isSongs ? 0.065 : 0.038)) {
+            ForEach(levels.indices, id: \.self) { index in
+                let level = levels[index]
+                Capsule()
+                    .fill(.white)
+                    .frame(
+                        width: diameter * (isSongs ? 0.114 : 0.071),
+                        height: diameter * (isSongs ? 0.22 + 0.5 * level : 0.58 * level)
+                    )
+            }
+        }
+        .frame(width: diameter, height: diameter)
     }
 
     static func bands(from spectrum: [Float]) -> [CGFloat] {

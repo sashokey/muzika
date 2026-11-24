@@ -6,8 +6,20 @@ enum GlassHoverMotion {
 }
 
 extension View {
-    func liquidGlassHover(outset: CGSize = CGSize(width: 1, height: 1)) -> some View {
-        modifier(LiquidGlassHover(outline: RoundedRectangle(cornerRadius: 8), outset: outset))
+    func liquidGlassHover(outset: CGSize = CGSize(width: 1, height: 1), hovered: Bool? = nil) -> some View {
+        modifier(LiquidGlassHover(outline: RoundedRectangle(cornerRadius: 8), outset: outset, hoverOverride: hovered))
+    }
+
+    func liquidGlassHover<Fill: ShapeStyle>(restingFill: Fill) -> some View {
+        modifier(LiquidGlassHover(
+            outline: RoundedRectangle(cornerRadius: 8), outset: .zero, restingFill: AnyShapeStyle(restingFill)
+        ))
+    }
+
+    func glassHoverMenu() -> some View {
+        menuStyle(.button)
+            .menuIndicator(.hidden)
+            .buttonStyle(GlassHoverButtonStyle(showsMenuIndicator: true))
     }
 
     func liquidGlassSidebarHover(selectionTint: Bool) -> some View {
@@ -33,6 +45,8 @@ private struct LiquidGlassHover<Outline: InsettableShape>: ViewModifier {
     var selectionTint = false
     var scale: CGFloat = 1
     var usesListRowHeight = false
+    var restingFill: AnyShapeStyle?
+    var hoverOverride: Bool?
     @Environment(\.defaultMinListRowHeight) private var listRowHeight
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -40,7 +54,7 @@ private struct LiquidGlassHover<Outline: InsettableShape>: ViewModifier {
     @State private var hovered = false
 
     func body(content: Content) -> some View {
-        let visible = hovered && isEnabled
+        let visible = (hoverOverride ?? hovered) && isEnabled
         content
             .background {
                 ZStack {
@@ -51,6 +65,8 @@ private struct LiquidGlassHover<Outline: InsettableShape>: ViewModifier {
                             .frame(height: usesListRowHeight ? listRowHeight : nil)
                             .scaleEffect(scale)
                             .transition(appearance)
+                    } else if let restingFill {
+                        outline.fill(restingFill)
                     }
                 }
                 .animation(reduceMotion ? nil : GlassHoverMotion.appearance, value: visible)
@@ -105,20 +121,23 @@ private struct GlassHoverReveal: ViewModifier, Animatable {
 
 struct GlassHoverButtonStyle: ButtonStyle {
     var prominent = false
-    var iconOnly = false
+    var iconSymbol: String?
+    var showsMenuIndicator = false
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.modifier(GlassHoverButtonSurface(
-            prominent: prominent, iconOnly: iconOnly, role: configuration.role, pressed: configuration.isPressed
+            prominent: prominent, iconSymbol: iconSymbol, role: configuration.role, pressed: configuration.isPressed,
+            showsMenuIndicator: showsMenuIndicator
         ))
     }
 }
 
 private struct GlassHoverButtonSurface: ViewModifier {
     let prominent: Bool
-    let iconOnly: Bool
+    let iconSymbol: String?
     let role: ButtonRole?
     let pressed: Bool
+    let showsMenuIndicator: Bool
     @Environment(\.controlSize) private var controlSize
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -146,8 +165,9 @@ private struct GlassHoverButtonSurface: ViewModifier {
         let foreground: Color = prominent ? .white : role == .destructive ? .red : .primary
         let restingFill: Color = prominent ? .accentColor : .primary.opacity(pressed ? 0.16 : 0.09)
         let fallback: Color = prominent ? .accentColor.opacity(0.85) : .primary.opacity(pressed ? 0.2 : 0.12)
+        let iconOnly = iconSymbol != nil
 
-        content
+        label(content, height: height, fontSize: fontSize)
             .font(.system(size: fontSize))
             .foregroundStyle(foreground)
             .padding(.horizontal, iconOnly ? 0 : height / 2)
@@ -163,5 +183,22 @@ private struct GlassHoverButtonSurface: ViewModifier {
             .contentShape(outline)
             .opacity(isEnabled ? 1 : 0.5)
             .onHover { hovered = $0 }
+    }
+
+    @ViewBuilder
+    private func label(_ content: Content, height: CGFloat, fontSize: CGFloat) -> some View {
+        if let iconSymbol {
+            CenteredControlSymbol(name: iconSymbol, size: CGSize(width: height + 10, height: height),
+                                  pointSize: fontSize, weight: .regular)
+        } else if showsMenuIndicator {
+            HStack(spacing: 8) {
+                content
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 7, weight: .semibold))
+                    .accessibilityHidden(true)
+            }
+        } else {
+            content
+        }
     }
 }

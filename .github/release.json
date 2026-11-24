@@ -1,6 +1,6 @@
 {
-  "version": "v7",
+  "version": "v8",
   "draft": false,
   "prerelease": false,
-  "notes": "- Moved synchronized lyrics to a native scroll view that renders the visible rows and animates automatic scrolling with Core Animation.\n- Fixed the flash and position jump when Instrumental ends. The countdown fades out while the next line smoothly moves into place and brightens.\n- Streamlined switching between library sections by reusing groups and sort results. Offscreen artwork views release their images and cancel pending thumbnail work.\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
+  "notes": "- Made Albums, Recently Added, and Artists scroll more smoothly by reusing artwork and text layers. Reduced row layout work in Songs.\n- Unified the library’s Liquid Glass headers and centered their filters. Artwork and rows remain visible through the glass while scrolling, with column headers pinned in Songs.\n- Refined hover shapes, search-field focus, and player control alignment.\n- Made the Songs playback indicator larger and drew it directly over the thumbnail. Reduced the corner radius of Songs thumbnails.\n- Refined synchronized lyrics with staggered line transitions and word-level accents.\n- Smoothed the Made by Sound fade when pausing and reduced the CPU work needed to prepare its wave maps.\n- Organized localizations under Resources.\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
 }

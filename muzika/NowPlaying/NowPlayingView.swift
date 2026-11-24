@@ -72,8 +72,9 @@ struct NowPlayingView: View {
         }
     }
 
-    private var analyzing: Bool {
-        state.playback.playing && visibleWindow && scenePhase != .background && !reduceMotion
+    private var waveActivity: WaveActivity {
+        guard visibleWindow, scenePhase != .background, !reduceMotion else { return .inactive }
+        return state.playback.playing ? .playing : .paused
     }
 
     private func background(track: AudioTrack) -> some View {
@@ -91,7 +92,7 @@ struct NowPlayingView: View {
             LinearGradient(colors: [Color(palette.highlight), Color(palette.shadow)], startPoint: .topLeading, endPoint: .bottomTrailing)
                 .opacity(fullScreen || softenedArtwork ? 0.5 : 1)
                 .animation(panelAnimation, value: palette)
-            WaveBackground(palette: palette, isActive: analyzing && paletteTrackID == track.id, playback: state.playback)
+            WaveBackground(palette: palette, activity: paletteTrackID == track.id ? waveActivity : .inactive, playback: state.playback)
                 .opacity(fullScreen ? 0.50 : 0.86)
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
@@ -179,12 +180,11 @@ struct NowPlayingView: View {
                     }
                     .disabled(track.isTemporary)
                 } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 16, weight: .semibold))
+                    CenteredControlSymbol(name: "ellipsis", size: PlayerIcon.size, pointSize: 16)
                 }
-                .menuStyle(.borderlessButton)
+                .menuStyle(.button)
+                .buttonStyle(.plain)
                 .menuIndicator(.hidden)
-                .fixedSize()
                 .frame(width: PlayerIcon.size.width, height: PlayerIcon.size.height)
                 .liquidGlassHover(in: Circle())
                 .help("More")

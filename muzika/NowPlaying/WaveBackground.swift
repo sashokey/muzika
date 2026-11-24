@@ -1,9 +1,15 @@
 import MetalKit
 import SwiftUI
 
+enum WaveActivity {
+    case inactive
+    case playing
+    case paused
+}
+
 struct WaveBackground: NSViewRepresentable {
     let palette: WavePalette
-    let isActive: Bool
+    let activity: WaveActivity
     let playback: PlaybackController
     var framesPerSecond = WaveClock.playerFramesPerSecond
 
@@ -21,12 +27,12 @@ struct WaveBackground: NSViewRepresentable {
         view.palette = palette
         view.spectrum = { [weak playback] in playback?.spectrum() ?? [] }
         view.onActivityChange = { [weak playback] active in playback?.setSpectrumEnabled(active, from: client) }
-        view.isActive = isActive
+        view.activity = activity
     }
 
     static func dismantleNSView(_ view: NSView, coordinator: UUID) {
         guard let view = view as? WaveMetalView else { return }
-        view.isActive = false
+        view.activity = .inactive
         view.spectrum = nil
         view.onActivityChange = nil
     }
@@ -71,12 +77,13 @@ private final class WaveMetalView: MTKView, MTKViewDelegate {
     var palette = WavePalette.defaultPalette
     var spectrum: (@MainActor () -> [Float])?
     var onActivityChange: (@MainActor (Bool) -> Void)?
-    var isActive = false {
+    var activity = WaveActivity.inactive {
         didSet {
-            if isActive != oldValue { updatePresentation() }
+            if activity != oldValue { updatePresentation() }
         }
     }
 
+    private static let opacityAnimationKey = "waveOpacity"
     private let queue: any MTLCommandQueue
     private lazy var imageContext = CIContext(mtlCommandQueue: queue, options: [.cacheIntermediates: false])
     private var clock: WaveClock
@@ -173,14 +180,22 @@ private final class WaveMetalView: MTKView, MTKViewDelegate {
     }
 
     private func updatePresentation() {
-        let active = isActive && window?.occlusionState.contains(.visible) == true
         let size = WaveScene.drawableSize(for: convertToBacking(bounds).size)
+        let visible = window?.occlusionState.contains(.visible) == true && size != .zero
+        let active = activity == .playing && visible
+        let clearsFrame = !visible || activity == .inactive || size != presentation.size
+        let fadesFrame = activity == .paused && !clearsFrame && presentation.hasFrame
         if presentation.update(active: active, size: size) {
-            showFallback()
+            presentedImage = nil
             clock = WaveClock(framesPerSecond: preferredFramesPerSecond)
         }
+        if clearsFrame {
+            showFallback()
+        } else if fadesFrame {
+            setWaveOpacity(0, animated: true)
+        }
         if size != .zero && drawableSize != size { drawableSize = size }
-        setPaused(!active || size == .zero)
+        setPaused(!active)
     }
 
     private func setPaused(_ paused: Bool) {
@@ -191,10 +206,25 @@ private final class WaveMetalView: MTKView, MTKViewDelegate {
 
     private func showFallback() {
         presentedImage = nil
+        guard let layer, layer.opacity != 0 || layer.animation(forKey: Self.opacityAnimationKey) != nil else { return }
+        setWaveOpacity(0, animated: false)
+    }
+
+    private func setWaveOpacity(_ opacity: Float, animated: Bool) {
+        guard let layer else { return }
+        let current = layer.presentation()?.opacity ?? layer.opacity
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        layer?.removeAnimation(forKey: "waveReveal")
-        layer?.opacity = 0
+        layer.removeAnimation(forKey: Self.opacityAnimationKey)
+        layer.opacity = opacity
+        if animated && current != opacity {
+            let animation = CABasicAnimation(keyPath: "opacity")
+            animation.fromValue = current
+            animation.toValue = opacity
+            animation.duration = 0.22
+            animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            layer.add(animation, forKey: Self.opacityAnimationKey)
+        }
         CATransaction.commit()
     }
 
@@ -204,21 +234,12 @@ private final class WaveMetalView: MTKView, MTKViewDelegate {
         updatePresentation()
         let valid = succeeded && frame.drawable.layer === layer
         let revealingFirstFrame = !presentation.hasFrame
-        guard presentation.complete(generation, succeeded: valid) else {
-            if !presentation.hasFrame { showFallback() }
-            return
-        }
+        guard presentation.complete(generation, succeeded: valid) else { return }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         frame.drawable.present()
-        layer?.opacity = 1
         if revealingFirstFrame {
-            let reveal = CABasicAnimation(keyPath: "opacity")
-            reveal.fromValue = 0
-            reveal.toValue = 1
-            reveal.duration = 0.22
-            reveal.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            layer?.add(reveal, forKey: "waveReveal")
+            setWaveOpacity(1, animated: true)
         }
         CATransaction.commit()
         presentedImage = frame.image

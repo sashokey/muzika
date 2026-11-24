@@ -74,46 +74,37 @@ struct PlayerVolumeButton: View {
 
 struct PlayerIcon: View {
     static let size = CGSize(width: 27, height: 28)
-    private static let closeSymbol = NSImage(systemSymbolName: "xmark", accessibilityDescription: nil)?
-        .withSymbolConfiguration(.init(pointSize: 15, weight: .semibold))
 
     let title: LocalizedStringResource
     let symbol: String
     let highlighted: Bool
     let hoverScale: CGFloat
+    let symbolScale: CGFloat
     let action: () -> Void
 
     init(
-        _ title: LocalizedStringResource, symbol: String, highlighted: Bool = false, hoverScale: CGFloat = 1,
+        _ title: LocalizedStringResource, symbol: String, highlighted: Bool = false, hoverScale: CGFloat = 1, symbolScale: CGFloat = 1,
         action: @escaping () -> Void
     ) {
         self.title = title
         self.symbol = symbol
         self.highlighted = highlighted
         self.hoverScale = hoverScale
+        self.symbolScale = symbolScale
         self.action = action
     }
 
     var body: some View {
         Button(action: action) {
-            icon
-                .font(.system(size: 15, weight: .semibold))
-                .frame(minWidth: Self.size.width, minHeight: Self.size.height)
+            CenteredControlSymbol(name: symbol, size: Self.size, symbolScale: symbolScale)
                 .foregroundStyle(highlighted ? Color.accentColor : Color.primary)
-                .contentShape(Rectangle())
+                .contentShape(Rectangle().scale(x: symbolScale, y: symbolScale))
         }
         .buttonStyle(.plain)
         .liquidGlassHover(in: Circle(), scale: hoverScale)
         .accessibilityLabel(title)
         .help(title)
         .accessibilityAddTraits(highlighted ? .isSelected : [])
-    }
-
-    private var icon: Image {
-        if symbol == "xmark", let closeSymbol = Self.closeSymbol {
-            return Image(nsImage: closeSymbol).renderingMode(.template)
-        }
-        return Image(systemName: symbol)
     }
 }
 
@@ -128,8 +119,10 @@ struct TransportControls: View {
             if !compact { Spacer(minLength: 0) }
             PlayerIcon("Previous", symbol: "backward.fill", hoverScale: primaryScale, action: playback.previous)
             if !compact { Spacer(minLength: 0) }
-            PlayerIcon(playback.playing ? "Pause" : "Play", symbol: playback.playing ? "pause.fill" : "play.fill", action: playback.togglePlayback)
-                .scaleEffect(primaryScale)
+            PlayerIcon(
+                playback.playing ? "Pause" : "Play", symbol: playback.playing ? "pause.fill" : "play.fill",
+                hoverScale: primaryScale, symbolScale: primaryScale, action: playback.togglePlayback
+            )
             if !compact { Spacer(minLength: 0) }
             PlayerIcon("Next", symbol: "forward.fill", hoverScale: primaryScale, action: playback.next)
             if !compact { Spacer(minLength: 0) }
@@ -222,10 +215,11 @@ struct PlayingCover: View {
 enum CoverDecoding {
     @concurrent
     static func image(_ data: Data, limit: Int) async -> CGImage? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        guard !Task.isCancelled, let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
         return CGImageSourceCreateThumbnailAtIndex(source, 0, [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
             kCGImageSourceThumbnailMaxPixelSize: limit
         ] as CFDictionary)
     }

@@ -65,6 +65,12 @@ nonisolated struct LyricsTextBlock: Sendable {
     }
 }
 
+enum LyricsAccentMotion {
+    case playing
+    case paused
+    case reduced
+}
+
 @MainActor
 final class LyricsRowLayer {
     let layer = CALayer()
@@ -74,6 +80,7 @@ final class LyricsRowLayer {
     struct Appearance: Equatable {
         let singing: Bool
         let dimmed: Bool
+        let idleOpacity: Float
         let hovered: Bool
         let softened: Bool
         let wordTime: Double
@@ -94,15 +101,70 @@ final class LyricsRowLayer {
     }
 
     func update(_ state: Appearance, animated: Bool) {
+        if !animated {
+            for block in blocks { block.stopScaleAnimation() }
+        }
         guard state != appearance else { return }
         let animate = animated && appearance != nil
         appearance = state
         for block in blocks { block.update(state, animated: animate) }
     }
+
+    func paintAccents(at position: Double, motion: LyricsAccentMotion, reposition: Bool = false) {
+        for block in blocks { block.paintAccents(at: position, motion: motion, reposition: reposition) }
+    }
 }
 
 @MainActor
 private final class LyricsBlockLayer {
+    private struct InkFragment {
+        let bounds: CGRect
+        let rightToLeft: Bool
+
+        func append(to path: CGMutablePath, width: CGFloat) {
+            let left = rightToLeft ? bounds.maxX - width : bounds.minX
+            let right = left + width
+            path.move(to: CGPoint(x: left, y: bounds.minY))
+            path.addLine(to: CGPoint(x: right, y: bounds.minY))
+            path.addLine(to: CGPoint(x: right, y: bounds.maxY))
+            path.addLine(to: CGPoint(x: left, y: bounds.maxY))
+            path.closeSubpath()
+        }
+    }
+
+    private struct WordInk {
+        let fragments: [InkFragment]
+        let width: CGFloat
+        let full: CGPath
+
+        init(fragments: [InkFragment]) {
+            self.fragments = fragments
+            width = fragments.reduce(0) { $0 + $1.bounds.width }
+            let path = CGMutablePath()
+            for fragment in fragments { path.addRect(fragment.bounds) }
+            full = path
+        }
+
+        func append(to path: CGMutablePath, progress: Double) {
+            var remaining = CGFloat(progress) * width
+            for fragment in fragments {
+                let amount = min(remaining, fragment.bounds.width)
+                fragment.append(to: path, width: amount)
+                remaining -= amount
+            }
+        }
+
+        func joins(during interval: Range<Double>) -> [Double] {
+            guard width > 0 else { return [] }
+            let duration = interval.upperBound - interval.lowerBound
+            var distance: CGFloat = 0
+            return fragments.dropLast().map { fragment in
+                distance += fragment.bounds.width
+                return interval.lowerBound + duration * Double(distance / width)
+            }
+        }
+    }
+
     let layer = CALayer()
     private let base: CALayer
     private let sharp: CGImage?
@@ -110,12 +172,17 @@ private final class LyricsBlockLayer {
     private var showingSoft = false
     private let permitsBlur: Bool
     private let text: LyricsTextBlock
-    private let wordPaths: [CGPath?]
+    private let wordInk: [WordInk]
     private var wordTime: Double?
+    private var activeWords: [Int] = []
+    private var accentMotion: LyricsAccentMotion?
+    private var accentPosition: Double?
     private let completed = CALayer()
     private let current = CALayer()
     private let completedMask = CAShapeLayer()
     private let currentMask = CAShapeLayer()
+    private static let sweepKey = "lyrics-accent-sweep"
+    private static let scaleKey = "lyrics-emphasis-scale"
     private static let blurContext = CIContext(options: [.cacheIntermediates: false, .useSoftwareRenderer: true])
 
     init(text: LyricsTextBlock, size: CGSize, scale: CGFloat, blur: Bool) {
@@ -126,12 +193,16 @@ private final class LyricsBlockLayer {
         let frame = CTFramesetterCreateFrame(setter, CFRange(), CGPath(rect: rect, transform: nil), nil)
         let primary = Self.image(frame, size: size, scale: scale, color: NSColor.white.cgColor)
         sharp = primary
+        let firstLine = (CTFrameGetLines(frame) as? [CTLine])?.first
+        let firstRun = firstLine.flatMap { (CTLineGetGlyphRuns($0) as? [CTRun])?.first }
+        let rightToLeft = firstRun.map { CTRunGetStatus($0).contains(.rightToLeft) } ?? false
+        layer.anchorPoint.x = rightToLeft ? 1 : 0
         layer.frame = rect
         if let primary {
             base = CALayer()
             base.contents = primary
-            wordPaths = Self.paths(in: frame, height: size.height, ranges: text.wordRanges)
-            if !wordPaths.isEmpty {
+            wordInk = Self.wordGeometry(in: frame, height: size.height, ranges: text.wordRanges)
+            if !wordInk.isEmpty {
                 completed.contents = primary
                 current.contents = Self.image(frame, size: size, scale: scale, color: NSColor.controlAccentColor.cgColor)
                 for (colored, mask) in [(completed, completedMask), (current, currentMask)] {
@@ -150,21 +221,22 @@ private final class LyricsBlockLayer {
             fallback.isWrapped = true
             fallback.alignmentMode = .natural
             base = fallback
-            wordPaths = []
+            wordInk = []
         }
         base.frame = rect
         base.contentsScale = scale
         layer.addSublayer(base)
-        if !wordPaths.isEmpty {
+        if !wordInk.isEmpty {
             layer.addSublayer(completed)
             layer.addSublayer(current)
         }
     }
 
     func update(_ appearance: LyricsRowLayer.Appearance, animated: Bool) {
-        let wordsActive = appearance.singing && !wordPaths.isEmpty
+        let wordsActive = appearance.singing && !wordInk.isEmpty
+        let idle = appearance.hovered ? (appearance.idleOpacity + 1) / 2 : appearance.idleOpacity
         let opacity: Float = text.isPrimary
-            ? (appearance.dimmed ? (appearance.hovered ? 0.75 : 0.5) : (wordsActive ? 0.65 : 1))
+            ? (appearance.dimmed ? idle : (wordsActive ? 0.65 : 1))
             : 0.65
         let oldOpacity = base.presentation()?.opacity ?? base.opacity
         if base.opacity != opacity {
@@ -189,23 +261,101 @@ private final class LyricsBlockLayer {
             showingSoft = appearance.softened
             base.contents = showingSoft ? (soft ?? sharp) : sharp
         }
+        updateScale(appearance.dimmed ? 0.97 : 1, animated: animated)
         let nextTime = wordsActive ? appearance.wordTime : nil
         if nextTime != wordTime {
             wordTime = nextTime
             completed.isHidden = nextTime == nil
-            current.isHidden = nextTime == nil
+            var nextActive: [Int] = []
             if let nextTime {
                 let completedPath = CGMutablePath()
-                let currentPath = CGMutablePath()
-                for (word, path) in zip(text.words, wordPaths) {
-                    guard let path else { continue }
-                    if word.isActive(at: nextTime) { currentPath.addPath(path) }
-                    else if (word.end ?? .infinity) <= nextTime { completedPath.addPath(path) }
+                for (index, word) in text.words.enumerated() {
+                    let ink = wordInk[index]
+                    guard ink.width > 0 else { continue }
+                    if word.isActive(at: nextTime) { nextActive.append(index) }
+                    else if (word.end ?? .infinity) <= nextTime { completedPath.addPath(ink.full) }
                 }
                 completedMask.path = completedPath
-                currentMask.path = currentPath
+            }
+            if activeWords != nextActive {
+                activeWords = nextActive
+                accentMotion = nil
+                accentPosition = nil
+                currentMask.removeAnimation(forKey: Self.sweepKey)
+                current.isHidden = nextActive.isEmpty
             }
         }
+    }
+
+    private func updateScale(_ scale: CGFloat, animated: Bool) {
+        guard layer.transform.m11 != scale else { return }
+        let start = layer.presentation()?.transform.m11 ?? layer.transform.m11
+        layer.transform = CATransform3DMakeScale(scale, scale, 1)
+        if animated {
+            let animation = CABasicAnimation(keyPath: "transform.scale")
+            animation.fromValue = start
+            animation.toValue = scale
+            animation.duration = 0.34
+            animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            layer.add(animation, forKey: Self.scaleKey)
+        }
+    }
+
+    func stopScaleAnimation() {
+        layer.removeAnimation(forKey: Self.scaleKey)
+    }
+
+    func paintAccents(at position: Double, motion: LyricsAccentMotion, reposition: Bool) {
+        guard !activeWords.isEmpty else { return }
+        if !reposition, accentMotion == motion, motion != .paused || accentPosition == position { return }
+        accentMotion = motion
+        accentPosition = position
+        currentMask.removeAnimation(forKey: Self.sweepKey)
+
+        let partial = accentMask(at: position, wholeWord: motion == .reduced)
+        guard motion == .playing else {
+            currentMask.path = partial
+            return
+        }
+
+        let stops = activeWords.flatMap { index -> [Double] in
+            guard let interval = interval(for: text.words[index]) else { return [] }
+            return wordInk[index].joins(during: interval) + [interval.upperBound]
+        }
+        let times = Set(stops.filter { $0 > position }).sorted()
+        guard let end = times.last, (end - position).isFinite else {
+            currentMask.path = partial
+            return
+        }
+        let points = [position] + times
+        let animation = CAKeyframeAnimation(keyPath: "path")
+        let paths = [partial] + times.map { accentMask(at: $0, wholeWord: false) }
+        animation.values = paths
+        animation.duration = end - position
+        animation.keyTimes = points.map { NSNumber(value: ($0 - position) / animation.duration) }
+        animation.calculationMode = .linear
+        currentMask.path = paths.last
+        currentMask.add(animation, forKey: Self.sweepKey)
+    }
+
+    private func accentMask(at position: Double, wholeWord: Bool) -> CGPath {
+        let path = CGMutablePath()
+        for index in activeWords {
+            let progress: Double
+            if !wholeWord, let interval = interval(for: text.words[index]) {
+                progress = min(1, max(0, (position - interval.lowerBound) / (interval.upperBound - interval.lowerBound)))
+            } else {
+                progress = 1
+            }
+            wordInk[index].append(to: path, progress: progress)
+        }
+        return path
+    }
+
+    private func interval(for word: LyricsWord) -> Range<Double>? {
+        guard let end = word.end, word.start.isFinite, end.isFinite, word.start < end,
+              (end - word.start).isFinite else { return nil }
+        return word.start..<end
     }
 
     private static func image(_ frame: CTFrame, size: CGSize, scale: CGFloat, color: CGColor) -> CGImage? {
@@ -221,14 +371,17 @@ private final class LyricsBlockLayer {
         return context.makeImage()
     }
 
-    private static func paths(in frame: CTFrame, height: CGFloat, ranges: [Range<Int>?]) -> [CGPath?] {
+    private static func wordGeometry(in frame: CTFrame, height: CGFloat, ranges: [Range<Int>?]) -> [WordInk] {
         guard !ranges.isEmpty else { return [] }
         let lines = CTFrameGetLines(frame) as! [CTLine]
         var origins = [CGPoint](repeating: .zero, count: lines.count)
         CTFrameGetLineOrigins(frame, CFRange(), &origins)
-        let paths = ranges.map { _ in CGMutablePath() }
+        var fragments = Array(repeating: [InkFragment](), count: ranges.count)
         for (line, origin) in zip(lines, origins) {
-            for run in CTLineGetGlyphRuns(line) as! [CTRun] {
+            let runs = (CTLineGetGlyphRuns(line) as! [CTRun]).sorted {
+                CTRunGetStringRange($0).location < CTRunGetStringRange($1).location
+            }
+            for run in runs {
                 let count = CTRunGetGlyphCount(run)
                 var indices = [CFIndex](repeating: 0, count: count)
                 var positions = [CGPoint](repeating: .zero, count: count)
@@ -239,17 +392,23 @@ private final class LyricsBlockLayer {
                 CTRunGetStringIndices(run, CFRange(), &indices)
                 CTRunGetPositions(run, CFRange(), &positions)
                 CTRunGetAdvances(run, CFRange(), &advances)
+                var runBounds = [CGRect?](repeating: nil, count: ranges.count)
                 for index in indices.indices {
                     let x = origin.x + positions[index].x
                     let next = x + advances[index].width
                     let rect = CGRect(x: min(x, next), y: height - origin.y - ascent,
                                       width: abs(next - x), height: ascent + descent)
-                    for (path, range) in zip(paths, ranges) where range?.contains(indices[index]) == true {
-                        path.addRect(rect)
+                    for (word, range) in ranges.enumerated() where range?.contains(indices[index]) == true {
+                        runBounds[word] = runBounds[word]?.union(rect) ?? rect
                     }
+                }
+                let rightToLeft = CTRunGetStatus(run).contains(.rightToLeft)
+                for (word, bounds) in runBounds.enumerated() {
+                    guard let bounds, bounds.width > 0 else { continue }
+                    fragments[word].append(InkFragment(bounds: bounds, rightToLeft: rightToLeft))
                 }
             }
         }
-        return paths.map { $0.isEmpty ? nil : $0 }
+        return fragments.map(WordInk.init)
     }
 }

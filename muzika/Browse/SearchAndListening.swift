@@ -67,7 +67,6 @@ struct LibrarySearchPage: View {
                     .pickerStyle(.segmented)
                     .labelsHidden()
                     .fixedSize()
-                    .liquidGlassHover(in: .capsule)
                 }
             }
             HStack(spacing: 8) {
@@ -85,8 +84,7 @@ struct LibrarySearchPage: View {
                 }
             }
             .padding(8)
-            .background(.quaternary.opacity(0.55), in: .rect(cornerRadius: 8))
-            .liquidGlassHover()
+            .liquidGlassHover(restingFill: .quaternary.opacity(0.55))
             Picker("Search Scope", selection: $scope) {
                 ForEach(BrowseSearchScope.allCases) { item in
                     Text(item.displayTitle).tag(item)
@@ -94,7 +92,6 @@ struct LibrarySearchPage: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .liquidGlassHover(in: .capsule)
             .padding(.vertical, 12)
 
             if terms.isEmpty {
@@ -196,7 +193,7 @@ struct LibrarySearchPage: View {
                             Image(systemName: item.symbol).foregroundStyle(.secondary)
                             Text(item.displayTitle).lineLimit(1)
                             Spacer()
-                            Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+                            Image(systemName: "chevron.forward").foregroundStyle(.tertiary)
                         }
                         .padding(.vertical, 10)
                         .contentShape(Rectangle())
@@ -434,32 +431,47 @@ struct ListeningBrowser: View {
     @State private var period = ListeningPeriod.all
 
     var body: some View {
-        VStack(spacing: 0) {
-            BrowseHeading(title: route.title, back: route == .home ? nil : back) {
-                if route == .statistics {
-                    Picker("Period", selection: $period) {
-                        ForEach(ListeningPeriod.allCases) { period in
-                            Text(period.displayTitle).tag(period)
-                        }
-                    }
-                    .labelsHidden()
-                    .fixedSize()
-                    .liquidGlassHover(in: .capsule)
+        if route == .home {
+            listeningScroll
+                .padding(.horizontal, 26)
+                .browseScrollUnderHeader()
+                .browseGlassHeader(spacing: BrowseLayout.headerSpacing) {
+                    heading.padding(.horizontal, 26)
                 }
+        } else {
+            VStack(spacing: 0) {
+                heading
+                listeningScroll
             }
-
-            ScrollView {
-                switch route {
-                case .home: home.padding(.trailing, 26)
-                case .history: timeline
-                case .statistics: statistics(since: period.start)
-                case .rewind: rewind
-                default: EmptyView()
-                }
-            }
-            .browseHoverGutter(route == .home ? .leading : [.horizontal, .top])
+            .padding(.horizontal, 26)
         }
-        .padding(.horizontal, 26)
+    }
+
+    private var heading: some View {
+        BrowseHeading(title: route.title, back: route == .home ? nil : back) {
+            if route == .statistics {
+                Picker("Period", selection: $period) {
+                    ForEach(ListeningPeriod.allCases) { period in
+                        Text(period.displayTitle).tag(period)
+                    }
+                }
+                .labelsHidden()
+                .fixedSize()
+            }
+        }
+    }
+
+    private var listeningScroll: some View {
+        ScrollView {
+            switch route {
+            case .home: home.padding(.trailing, 26)
+            case .history: timeline
+            case .statistics: statistics(since: period.start)
+            case .rewind: rewind
+            default: EmptyView()
+            }
+        }
+        .browseHoverGutter(route == .home ? .leading : [.horizontal, .top])
     }
 
     private var home: some View {

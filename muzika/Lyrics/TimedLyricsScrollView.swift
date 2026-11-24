@@ -35,6 +35,8 @@ final class TimedLyricsScrollView: NSScrollView {
     private var accessibilityRows: [LyricsAccessibilityRow]?
     private var accessibilityCountdown: LyricsAccessibilityRow?
     private var time = -Double.greatestFiniteMagnitude
+    private var accentPosition: Double?
+    private var accentMotion: LyricsAccentMotion = .paused
     private var focus: Focus?
     private var activeGap: LyricsGap?
     private var manualUntil: CFTimeInterval?
@@ -46,6 +48,7 @@ final class TimedLyricsScrollView: NSScrollView {
     private var gapExitID: UUID?
     private static let cueDuration: CFTimeInterval = 0.24
     private static let scrollAnimationKey = "lyrics-scroll"
+    private static let rowStaggerKey = "lyrics-row-stagger"
     private static let countdownFadeKey = "lyrics-countdown-fade"
     private static let gapPositionKey = "lyrics-gap-position"
 
@@ -58,6 +61,7 @@ final class TimedLyricsScrollView: NSScrollView {
         let id: UInt64
         let from: CGFloat
         let to: CGFloat
+        let staggered: Bool
     }
 
     override init(frame frameRect: NSRect) {
@@ -102,6 +106,8 @@ final class TimedLyricsScrollView: NSScrollView {
             accessibilityCountdown = nil
             focus = nil
             time = -Double.greatestFiniteMagnitude
+            accentPosition = nil
+            accentMotion = .paused
             activeGap = nil
             hover = nil
             stopMotion(keepingPosition: false)
@@ -113,7 +119,10 @@ final class TimedLyricsScrollView: NSScrollView {
         } else if old?.blur != next.blur {
             clearLayers()
         }
-        if next.reduceMotion { clearGapExit() }
+        if next.reduceMotion {
+            clearGapExit()
+            for row in rowLayers.values { row.layer.removeAnimation(forKey: Self.rowStaggerKey) }
+        }
         let clips = next.topOverflow <= 0
         if clipsToBounds != clips { clipsToBounds = clips }
         if contentView.clipsToBounds != clips { contentView.clipsToBounds = clips }
@@ -323,9 +332,24 @@ final class TimedLyricsScrollView: NSScrollView {
     private func updateCue(force: Bool = false, at overrideTime: Double? = nil) {
         guard let configuration, let geometry else { return }
         let now = overrideTime ?? audioTime
+        let delta = accentPosition.map { now - $0 }
+        let motion: LyricsAccentMotion = configuration.reduceMotion ? .reduced
+            : (configuration.playing && delta != 0 ? .playing : .paused)
+        let reposition = force || (delta.map { $0 < 0 || $0 > 0.12 } ?? false)
+        let refreshAccents = reposition || motion != accentMotion || (motion == .paused && delta != 0)
+        accentPosition = now
+        accentMotion = motion
         let next = configuration.document.displayTime(at: now)
         if next == time && !force {
             if activeGap != nil { updateCountdown(at: now) }
+            if refreshAccents {
+                CATransaction.begin()
+                CATransaction.setDisableActions(true)
+                for row in rowLayers.values {
+                    row.paintAccents(at: now, motion: motion, reposition: reposition)
+                }
+                CATransaction.commit()
+            }
             return
         }
         let previous = focus
@@ -362,14 +386,22 @@ final class TimedLyricsScrollView: NSScrollView {
                 reconcileRows(force: true)
             }
             if following {
-                center(animated: previous != nil && !configuration.reduceMotion)
+                let staggerFrom: Int?
+                if !reposition, motion == .playing, case .row = previous, case .row(let row) = focus {
+                    staggerFrom = row
+                } else {
+                    staggerFrom = nil
+                }
+                center(animated: previous != nil && !configuration.reduceMotion, staggerFrom: staggerFrom)
             }
             if let gapExit, !configuration.reduceMotion, window != nil {
                 animateGapExit(before: gapExit.row, offsetChange: contentView.bounds.minY - gapExit.oldOffset,
                                extent: geometry.gapExtent)
             }
         }
-        for row in rowLayers.keys { updateRow(row, animated: !force && !configuration.reduceMotion) }
+        for row in rowLayers.keys {
+            updateRow(row, animated: !force && !configuration.reduceMotion, repositionAccents: reposition)
+        }
         updateCountdown(at: now)
         CATransaction.commit()
         updateClocks()
@@ -407,15 +439,28 @@ final class TimedLyricsScrollView: NSScrollView {
         CATransaction.commit()
     }
 
-    private func updateRow(_ index: Int, animated: Bool) {
+    private func updateRow(_ index: Int, animated: Bool, repositionAccents: Bool = false) {
         guard let configuration, let row = rowLayers[index] else { return }
         let line = configuration.document.lines[index]
         let singing = isSinging(line)
-        let dimmed = focus != nil && focus != .row(index) && !singing
+        let dimmed = focus != .row(index) && !singing
         let hasWords = !line.words.isEmpty || !line.pronunciationWords.isEmpty || !line.translationWords.isEmpty
-        row.update(LyricsRowLayer.Appearance(singing: singing, dimmed: dimmed, hovered: hover == index,
+        row.update(LyricsRowLayer.Appearance(singing: singing, dimmed: dimmed, idleOpacity: idleOpacity(for: index),
+                                             hovered: hover == index,
                                              softened: dimmed && configuration.blur,
                                              wordTime: singing && hasWords ? time : -.infinity), animated: animated)
+        if singing, hasWords {
+            row.paintAccents(at: accentPosition ?? time, motion: accentMotion, reposition: repositionAccents)
+        }
+    }
+
+    private func idleOpacity(for index: Int) -> Float {
+        guard case .row(let current) = focus else { return 0.5 }
+        switch abs(index - current) {
+        case 0...1: return 0.5
+        case 2: return 0.46
+        default: return 0.42
+        }
     }
 
     private func isSinging(_ line: LyricsLine) -> Bool {
@@ -436,7 +481,7 @@ final class TimedLyricsScrollView: NSScrollView {
         CATransaction.commit()
     }
 
-    private func center(animated: Bool) {
+    private func center(animated: Bool, staggerFrom: Int? = nil) {
         guard let focus, let geometry else { return }
         let target: CGFloat
         switch focus {
@@ -458,16 +503,39 @@ final class TimedLyricsScrollView: NSScrollView {
 
         motionID &+= 1
         let id = motionID
-        motion = Motion(id: id, from: start, to: end)
+        motion = Motion(id: id, from: start, to: end, staggered: staggerFrom != nil)
         reconcileRows()
 
         let animation = cueAnimation("transform.translation.y", from: 0, to: start - end)
+        if let staggerFrom {
+            animation.duration = 0.34
+            staggerRows(after: staggerFrom, distance: end - start, duration: animation.duration)
+        }
         animation.fillMode = .forwards
         animation.isRemovedOnCompletion = false
         CATransaction.setCompletionBlock { [weak self] in
             Task { @MainActor [weak self] in self?.finishMotion(id: id) }
         }
         tiles.add(animation, forKey: Self.scrollAnimationKey)
+    }
+
+    private func staggerRows(after anchor: Int, distance: CGFloat, duration: CFTimeInterval) {
+        let direction = distance > 0 ? 1 : -1
+        let step = min(abs(distance) * 0.10, 5) * CGFloat(direction)
+        for (index, row) in rowLayers {
+            let lag = min(max((index - anchor) * direction, 0), 4)
+            let start = row.layer.presentation()?.transform.m42 ?? 0
+            guard lag > 0 || start != 0 else { continue }
+            let animation = CAKeyframeAnimation(keyPath: "transform.translation.y")
+            animation.values = [start, step * CGFloat(lag), 0]
+            animation.keyTimes = [0, 0.45, 1]
+            animation.timingFunctions = [
+                CAMediaTimingFunction(name: .easeInEaseOut),
+                CAMediaTimingFunction(name: .easeInEaseOut),
+            ]
+            animation.duration = duration
+            row.layer.add(animation, forKey: Self.rowStaggerKey)
+        }
     }
 
     private func cueAnimation(_ keyPath: String, from: CGFloat, to: CGFloat) -> CABasicAnimation {
@@ -576,7 +644,7 @@ final class TimedLyricsScrollView: NSScrollView {
         guard let geometry, let typography = measuredTypography, let configuration else { return nil }
         let x = (canvas.bounds.width - typography.containerWidth) / 2 + typography.horizontalInset
         let localPoint = CGPoint(x: point.x, y: point.y - displayedTranslation)
-        let row = if gapExitID != nil {
+        let row = if gapExitID != nil || motion?.staggered == true {
             rowLayers.first { ($0.value.layer.presentation()?.frame ?? $0.value.layer.frame).contains(localPoint) }?.key
         } else {
             geometry.row(at: localPoint.y, gapBefore: gapIndex)
