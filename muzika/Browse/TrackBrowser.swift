@@ -95,7 +95,7 @@ struct TrackBrowserPage: View {
             }
         }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: onlyAlbums)
-        .searchable(text: $query, placement: .toolbar, prompt: onlyAlbums ? "Filter Albums" : "Filter Songs")
+        .windowLibraryFilter(text: $query, prompt: onlyAlbums ? "Filter Albums" : "Filter Songs")
     }
 
     private func header(onlyAlbums: Bool, selectedTracks: [AudioTrack]) -> some View {
@@ -219,11 +219,9 @@ struct BrowsePlaybackButtons: View {
     var body: some View {
         HStack(spacing: 10) {
             Button("Play", systemImage: "play.fill") { playback.play(tracks, shuffled: false) }
-                .buttonStyle(.borderedProminent)
-                .liquidGlassHover(in: .capsule)
+                .buttonStyle(GlassHoverButtonStyle(prominent: true))
             Button("Shuffle", systemImage: "shuffle") { playback.play(tracks, shuffled: true) }
-                .buttonStyle(.bordered)
-                .liquidGlassHover(in: .capsule)
+                .buttonStyle(GlassHoverButtonStyle())
         }
         .disabled(tracks.isEmpty)
     }
@@ -706,7 +704,7 @@ struct FolderBrowserPage: View {
                     }
                     if folder == nil {
                         Button("Add Folder", systemImage: "folder.badge.plus", action: addFolder)
-                            .liquidGlassHover(in: .capsule)
+                            .buttonStyle(GlassHoverButtonStyle())
                             .disabled(library.isScanning)
                     }
                 }
@@ -723,7 +721,7 @@ struct FolderBrowserPage: View {
             }
             .padding(.horizontal, 26)
         }
-        .searchable(text: $query, placement: .toolbar, prompt: "Filter Folders")
+        .windowLibraryFilter(text: $query, prompt: "Filter Folders")
     }
 
     private func folderList(_ folders: [Folder]) -> some View {

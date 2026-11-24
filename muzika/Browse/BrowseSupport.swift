@@ -488,8 +488,8 @@ struct BrowseHeading<Actions: View>: View {
             if let back {
                 Button("Back", systemImage: "chevron.left", action: back)
                     .labelStyle(.iconOnly)
+                    .buttonStyle(GlassHoverButtonStyle(iconOnly: true))
                     .help("Back")
-                    .liquidGlassHover(in: .circle)
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)

@@ -73,11 +73,7 @@ struct LibraryShell<Player: View, Settings: View>: View {
 
     private func sidebarRow(_ destination: LibraryRoute) -> some View {
         Label(destination.title, systemImage: destination.symbol)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .liquidGlassHover(
-                outset: CGSize(width: 6, height: 4),
-                selectionTint: route.sidebarRoute == destination
-            )
+            .liquidGlassSidebarHover(selectionTint: route.sidebarRoute == destination)
             .tag(destination)
     }
 
@@ -299,14 +295,14 @@ private struct RecentlyAddedPage: View {
             VStack(spacing: 0) {
                 BrowseHeading(title: String(localized: "Library")) {
                     Button("Add Folder", systemImage: "folder.badge.plus", action: addFolder)
-                        .liquidGlassHover(in: .capsule)
+                        .buttonStyle(GlassHoverButtonStyle())
                         .disabled(library.isScanning)
                 }
                 status
             }
             .padding(.horizontal, 26)
         }
-        .searchable(text: $query, placement: .toolbar, prompt: "Filter Library")
+        .windowLibraryFilter(text: $query, prompt: "Filter Library")
     }
 
     @ViewBuilder
@@ -414,7 +410,7 @@ struct GroupBrowserPage: View {
             }
             .padding(.horizontal, 26)
         }
-        .searchable(text: $query, placement: .toolbar, prompt: Text(filterPrompt))
+        .windowLibraryFilter(text: $query, prompt: filterPrompt)
     }
 
     private var emptyLibraryTitle: LocalizedStringResource {

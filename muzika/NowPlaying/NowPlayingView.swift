@@ -224,7 +224,7 @@ struct NowPlayingView: View {
                         presentingAudioInfo = false
                         state.showingInfo = true
                     }
-                    .liquidGlassHover()
+                    .buttonStyle(GlassHoverButtonStyle())
                 }
                 .padding(15)
                 .frame(minWidth: 180)

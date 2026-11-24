@@ -74,6 +74,8 @@ struct PlayerVolumeButton: View {
 
 struct PlayerIcon: View {
     static let size = CGSize(width: 27, height: 28)
+    private static let closeSymbol = NSImage(systemSymbolName: "xmark", accessibilityDescription: nil)?
+        .withSymbolConfiguration(.init(pointSize: 15, weight: .semibold))
 
     let title: LocalizedStringResource
     let symbol: String
@@ -94,7 +96,7 @@ struct PlayerIcon: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: symbol)
+            icon
                 .font(.system(size: 15, weight: .semibold))
                 .frame(minWidth: Self.size.width, minHeight: Self.size.height)
                 .foregroundStyle(highlighted ? Color.accentColor : Color.primary)
@@ -105,6 +107,13 @@ struct PlayerIcon: View {
         .accessibilityLabel(title)
         .help(title)
         .accessibilityAddTraits(highlighted ? .isSelected : [])
+    }
+
+    private var icon: Image {
+        if symbol == "xmark", let closeSymbol = Self.closeSymbol {
+            return Image(nsImage: closeSymbol).renderingMode(.template)
+        }
+        return Image(systemName: symbol)
     }
 }
 

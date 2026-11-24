@@ -1,6 +1,6 @@
 {
-  "version": "v2",
+  "version": "v3",
   "draft": false,
   "prerelease": false,
-  "notes": "- Now Playing opens with a consistent animation across library sections and restores the toolbar when returning.\n- Synchronized lyrics scroll more smoothly, stay clickable, and brighten when hovered.\n- Play and Pause appear on playable artwork. The current track has an animated playback indicator on its cover.\n- Liquid Glass hover feedback extends across the library, search, settings, and player, with corrected spacing and clipping.\n- Home has more room beside the scrollbar, and Albums has a gap below the header.\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
+  "notes": "- The macOS window controls and sidebar rows stay in the same positions when switching sections.\n- Sidebar hover highlights have a consistent height, and Liquid Glass replaces the resting background and border on buttons.\n- The close icon is centered in Now Playing.\n- Timed lyrics use a highlight halfway between the idle and current lines, with a pointing-hand cursor.\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
 }

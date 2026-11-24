@@ -61,11 +61,7 @@ struct PreferencesView: View {
             if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 List(PreferencesPage.allCases, selection: $state.settingsPage) { page in
                     Label(page.title, systemImage: page.symbol)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .liquidGlassHover(
-                            outset: CGSize(width: 6, height: 5),
-                            selectionTint: state.settingsPage == page
-                        )
+                        .liquidGlassSidebarHover(selectionTint: state.settingsPage == page)
                         .tag(page)
                 }
                 .listStyle(.sidebar)
@@ -262,7 +258,7 @@ struct PreferencesView: View {
                 }
                 Section("Listening statistics") {
                     Button(PreferencesItem.listeningStatistics.title) { state.navigate(.statistics) }
-                        .liquidGlassHover()
+                        .buttonStyle(GlassHoverButtonStyle())
                         .id(PreferencesItem.listeningStatistics)
                 }
             }
@@ -280,7 +276,7 @@ struct PreferencesView: View {
                             .monospacedDigit()
                             .frame(minWidth: 46)
                         Button("Reset") { preferences.lyricsSize = 1 }
-                            .liquidGlassHover()
+                            .buttonStyle(GlassHoverButtonStyle())
                             .disabled(preferences.lyricsSize == 1)
                     }
                     .id(PreferencesItem.lyricsSize)
@@ -299,7 +295,7 @@ struct PreferencesView: View {
                             .monospacedDigit()
                             .frame(minWidth: 82)
                         Button("Reset") { preferences.lyricsOffset = 0 }
-                            .liquidGlassHover()
+                            .buttonStyle(GlassHoverButtonStyle())
                             .disabled(preferences.lyricsOffset == 0)
                     }
                     .id(PreferencesItem.lyricsTiming)
@@ -406,7 +402,7 @@ private struct LibraryPreferences: View {
                 Button(PreferencesItem.addFolder.title, systemImage: "plus") {
                     state.chooseFiles(folder: true, appendSource: true)
                 }
-                .liquidGlassHover()
+                .buttonStyle(GlassHoverButtonStyle())
                 .id(PreferencesItem.addFolder)
             }
             Section("Scan Status") {
@@ -436,10 +432,9 @@ private struct LibraryPreferences: View {
                                 library.pauseScan()
                             }
                         }
-                        .liquidGlassHover()
                         Button("Cancel") { library.cancelScan() }
-                            .liquidGlassHover()
                     }
+                    .buttonStyle(GlassHoverButtonStyle())
                 }
                 if let error = library.scanError {
                     Label(error, systemImage: "exclamationmark.triangle")
@@ -450,7 +445,7 @@ private struct LibraryPreferences: View {
                         .monospacedDigit()
                     Button("Show") { showingIssues = true }
                         .accessibilityLabel("Show unreadable files")
-                        .liquidGlassHover()
+                        .buttonStyle(GlassHoverButtonStyle())
                         .disabled(library.scanIssues.isEmpty)
                 }
                 .id(PreferencesItem.unreadableFiles)
@@ -458,18 +453,16 @@ private struct LibraryPreferences: View {
             Section("Actions") {
                 Group {
                     Button(PreferencesItem.scanLibrary.title) { Task { await state.scan() } }
-                        .liquidGlassHover()
                         .id(PreferencesItem.scanLibrary)
                     Button(PreferencesItem.forceScan.title) { Task { await state.scan(force: true) } }
-                        .liquidGlassHover()
                         .id(PreferencesItem.forceScan)
                     Button(PreferencesItem.cleanupMissing.title) { Task { await library.cleanupMissingFiles() } }
-                        .liquidGlassHover()
                         .id(PreferencesItem.cleanupMissing)
                 }
+                .buttonStyle(GlassHoverButtonStyle())
                 .disabled(library.sources.isEmpty || library.isScanning)
                 Button(PreferencesItem.clearLibrary.title, role: .destructive) { confirmingClear = true }
-                    .liquidGlassHover()
+                    .buttonStyle(GlassHoverButtonStyle())
                     .disabled(!library.hasIndexedTracks)
                     .id(PreferencesItem.clearLibrary)
             }
@@ -505,7 +498,7 @@ private struct LibraryPreferences: View {
                 }
                 Button("Done") { showingIssues = false }
                     .keyboardShortcut(.defaultAction)
-                    .liquidGlassHover()
+                    .buttonStyle(GlassHoverButtonStyle(prominent: true))
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .padding(20)
@@ -527,7 +520,7 @@ private struct CachePreferences: View {
                 .id(PreferencesItem.coverCache)
                 LabeledContent("Images", value: library.artworkCacheCount.formatted())
                 Button("Clear", role: .destructive) { confirmingClear = true }
-                    .liquidGlassHover()
+                    .buttonStyle(GlassHoverButtonStyle())
                     .disabled(library.artworkCacheCount == 0)
                     .id(PreferencesItem.clearCache)
             }
@@ -545,7 +538,7 @@ private struct LicenseDisclosure: View {
 
     var body: some View {
         Button(PreferencesItem.license.title) { showingLicense = true }
-            .liquidGlassHover()
+            .buttonStyle(GlassHoverButtonStyle())
             .sheet(isPresented: $showingLicense) {
                 VStack(alignment: .trailing, spacing: 12) {
                     ScrollView {
@@ -556,7 +549,7 @@ private struct LicenseDisclosure: View {
                     }
                     Button("Done") { showingLicense = false }
                         .keyboardShortcut(.defaultAction)
-                        .liquidGlassHover()
+                        .buttonStyle(GlassHoverButtonStyle(prominent: true))
                 }
                 .padding(20)
                 .frame(minWidth: 560, idealWidth: 650, minHeight: 400, idealHeight: 540)

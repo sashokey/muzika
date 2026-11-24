@@ -89,7 +89,9 @@ private struct MainWindow: View {
         .dynamicTypeSize(state.preferences.largerInterface ? max(typeSize, .xxLarge) : typeSize)
         .controlSize(state.preferences.largerInterface ? .large : controlSize)
         .frame(minWidth: 690, minHeight: 520)
-        .background(WindowTitlebar(showsTitle: !state.showingPlayer))
+        .backgroundPreferenceValue(WindowLibraryFilterKey.self) { filter in
+            WindowTitlebar(showsTitle: !state.showingPlayer, filter: state.showingPlayer ? nil : filter)
+        }
         .overlay(alignment: .topTrailing) {
             if state.importing {
                 ProgressView("Opening audio…")
@@ -188,21 +190,75 @@ private struct MainWindow: View {
     }
 }
 
+private struct WindowLibraryFilter {
+    let text: Binding<String>
+    let prompt: LocalizedStringResource
+}
+
+private struct WindowLibraryFilterKey: PreferenceKey {
+    static var defaultValue: WindowLibraryFilter? { nil }
+
+    static func reduce(value: inout WindowLibraryFilter?, nextValue: () -> WindowLibraryFilter?) {
+        if let next = nextValue() { value = next }
+    }
+}
+
+extension View {
+    func windowLibraryFilter(text: Binding<String>, prompt: LocalizedStringResource) -> some View {
+        preference(key: WindowLibraryFilterKey.self, value: WindowLibraryFilter(text: text, prompt: prompt))
+    }
+}
+
 private struct WindowTitlebar: NSViewRepresentable {
     var showsTitle: Bool
+    var filter: WindowLibraryFilter?
 
     func makeNSView(context: Context) -> TitlebarView { TitlebarView() }
 
     func updateNSView(_ view: TitlebarView, context: Context) {
-        view.showsTitle = showsTitle
+        view.update(showsTitle: showsTitle, filter: filter)
     }
 
     final class TitlebarView: NSView {
-        var showsTitle = true {
-            didSet {
-                if let window, showsTitle != oldValue { updateAccessory(in: window) }
-            }
-        }
+        private var showsTitle = true
+        private var filter: WindowLibraryFilter?
+        private lazy var filterField: NSSearchField = {
+            let field = NSSearchField()
+            field.target = self
+            field.action = #selector(filterChanged)
+            field.sendsSearchStringImmediately = true
+            field.isBezeled = false
+            field.translatesAutoresizingMaskIntoConstraints = false
+            return field
+        }()
+        private lazy var filterAccessory: NSTitlebarAccessoryViewController = {
+            let filterWidth: CGFloat = 325
+            let filterHeight: CGFloat = 28
+            let leadingInset: CGFloat = 18
+            let glass = NSGlassEffectView()
+            glass.cornerRadius = filterHeight / 2
+            glass.effectIsInteractive = true
+            glass.translatesAutoresizingMaskIntoConstraints = false
+
+            let content = NSView()
+            content.addSubview(filterField)
+            glass.contentView = content
+
+            let container = NSView(frame: NSRect(x: 0, y: 0, width: filterWidth + leadingInset, height: 32))
+            container.addSubview(glass)
+            NSLayoutConstraint.activate([
+                glass.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: leadingInset),
+                glass.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+                glass.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+                glass.heightAnchor.constraint(equalToConstant: filterHeight),
+                filterField.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 6),
+                filterField.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -6),
+                filterField.centerYAnchor.constraint(equalTo: content.centerYAnchor)
+            ])
+            let accessory = NSTitlebarAccessoryViewController()
+            accessory.view = container
+            return accessory
+        }()
 
         private let accessory: NSTitlebarAccessoryViewController = {
             let icon = NSImageView()
@@ -234,10 +290,20 @@ private struct WindowTitlebar: NSViewRepresentable {
             return accessory
         }()
 
+        func update(showsTitle: Bool, filter: WindowLibraryFilter?) {
+            self.showsTitle = showsTitle
+            self.filter = filter
+            if let window { updateAccessories(in: window) }
+        }
+
+        @objc private func filterChanged(_ sender: NSSearchField) {
+            filter?.text.wrappedValue = sender.stringValue
+        }
+
         override func viewWillMove(toWindow newWindow: NSWindow?) {
-            if let window, window !== newWindow,
-               let index = window.titlebarAccessoryViewControllers.firstIndex(of: accessory) {
-                window.removeTitlebarAccessoryViewController(at: index)
+            if let window, window !== newWindow {
+                setAccessory(accessory, visible: false, in: window)
+                setAccessory(filterAccessory, visible: false, in: window)
             }
             super.viewWillMove(toWindow: newWindow)
         }
@@ -247,12 +313,25 @@ private struct WindowTitlebar: NSViewRepresentable {
             guard let window else { return }
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
-            updateAccessory(in: window)
+            filterAccessory.layoutAttribute = window.windowTitlebarLayoutDirection == .rightToLeft ? .right : .left
+            updateAccessories(in: window)
         }
 
-        private func updateAccessory(in window: NSWindow) {
+        private func updateAccessories(in window: NSWindow) {
+            setAccessory(accessory, visible: showsTitle, in: window)
+            if let filter {
+                let prompt = String(localized: filter.prompt)
+                filterField.placeholderString = prompt
+                filterField.setAccessibilityLabel(prompt)
+                let text = filter.text.wrappedValue
+                if filterField.stringValue != text { filterField.stringValue = text }
+            }
+            setAccessory(filterAccessory, visible: filter != nil, in: window)
+        }
+
+        private func setAccessory(_ accessory: NSTitlebarAccessoryViewController, visible: Bool, in window: NSWindow) {
             let index = window.titlebarAccessoryViewControllers.firstIndex(of: accessory)
-            if showsTitle {
+            if visible {
                 if index == nil { window.addTitlebarAccessoryViewController(accessory) }
             } else if let index {
                 window.removeTitlebarAccessoryViewController(at: index)

@@ -57,7 +57,7 @@ struct LibrarySearchPage: View {
             BrowseHeading(title: LibraryRoute.search.title) {
                 if scope == .lyrics {
                     Button("Refresh lyrics search", systemImage: "arrow.clockwise", action: refreshLyrics)
-                        .liquidGlassHover(in: .capsule)
+                        .buttonStyle(GlassHoverButtonStyle())
                 }
                 if !terms.isEmpty {
                     Picker("Result View", selection: $resultsAsGrid) {
@@ -162,7 +162,7 @@ struct LibrarySearchPage: View {
                     recentData = Data()
                     recentDestinationsData = Data()
                 }
-                .liquidGlassHover(in: .capsule)
+                .buttonStyle(GlassHoverButtonStyle())
             }
             .padding(.vertical, 9)
 
@@ -478,7 +478,7 @@ struct ListeningBrowser: View {
                         Spacer()
                         Button("Listening Statistics", systemImage: "chevron.right") { navigate(.statistics) }
                             .controlSize(.small)
-                            .liquidGlassHover(in: .capsule)
+                            .buttonStyle(GlassHoverButtonStyle())
                     }
                     BrowseSongGrid(
                         library: library, tracks: recent, playback: playback, displayAlbum: true, limit: 6,
@@ -495,7 +495,7 @@ struct ListeningBrowser: View {
                         Spacer()
                         Button("See All") { navigate(.recentlyAdded) }
                             .controlSize(.small)
-                            .liquidGlassHover(in: .capsule)
+                            .buttonStyle(GlassHoverButtonStyle())
                     }
                     BrowseGroupGrid(groups: Array(latest.prefix(6)), library: library, playback: playback, open: navigate)
                 }
@@ -511,18 +511,18 @@ struct ListeningBrowser: View {
                 )
                 .padding(.vertical, 12)
                 Button("Browse Library", systemImage: "music.note.list") { navigate(.recentlyAdded) }
-                    .liquidGlassHover(in: .capsule)
+                    .buttonStyle(GlassHoverButtonStyle())
                     .frame(maxWidth: .infinity)
             }
             HStack(spacing: 12) {
                 Button("Listening History", systemImage: LibraryRoute.history.symbol) { navigate(.history) }
-                    .liquidGlassHover(in: .capsule)
+                    .buttonStyle(GlassHoverButtonStyle())
                 if recent.isEmpty {
                     Button("Listening Statistics", systemImage: LibraryRoute.statistics.symbol) { navigate(.statistics) }
-                        .liquidGlassHover(in: .capsule)
+                        .buttonStyle(GlassHoverButtonStyle())
                 }
                 Button("Listening Rewind", systemImage: LibraryRoute.rewind.symbol) { navigate(.rewind) }
-                    .liquidGlassHover(in: .capsule)
+                    .buttonStyle(GlassHoverButtonStyle())
                 Spacer()
             }
         }
@@ -547,8 +547,7 @@ struct ListeningBrowser: View {
                     playback.play(last, in: [last])
                 }
             }
-            .buttonStyle(.borderedProminent)
-            .liquidGlassHover(in: .capsule)
+            .buttonStyle(GlassHoverButtonStyle(prominent: true))
         }
         .padding(12)
         .background(.quaternary.opacity(0.7), in: .rect(cornerRadius: 10))

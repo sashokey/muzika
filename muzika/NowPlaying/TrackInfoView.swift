@@ -50,13 +50,13 @@ struct TrackInfoView: View {
                 Button("Copy metadata") {
                     copy([track.title, track.artist, track.album, track.genre, track.quality].filter { !$0.isEmpty }.joined(separator: "\n"))
                 }
-                .liquidGlassHover()
+                .buttonStyle(GlassHoverButtonStyle())
                 Button("Copy path") { copy(track.url.path) }
-                    .liquidGlassHover()
+                    .buttonStyle(GlassHoverButtonStyle())
                 Spacer()
                 Button("Done") { dismiss() }
                     .keyboardShortcut(.defaultAction)
-                    .liquidGlassHover()
+                    .buttonStyle(GlassHoverButtonStyle(prominent: true))
             }
         }
         .padding(20)

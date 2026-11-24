@@ -262,6 +262,7 @@ struct LyricsPanel: View {
                 label.equatable().contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .pointerStyle(.link)
             .onHover { hovered = $0 }
             .accessibilityAddTraits(text.singing ? .isSelected : [])
             .accessibilityHint(text.line.isBackground ? "Backing vocals. Seeks to this line." : "Seeks to this line.")
@@ -287,7 +288,7 @@ struct LyricsPanel: View {
 
         var body: some View {
             let emphasisAnimation: Animation? = reduceMotion ? nil : .easeInOut(duration: 0.24)
-            let opacity = deEmphasized ? (hovered ? 0.72 : 0.5) : 1
+            let opacity = deEmphasized ? (hovered ? 0.75 : 0.5) : 1
             VStack(alignment: .leading, spacing: layout.auxiliarySpacing) {
                 if let pronunciation = line.pronunciation {
                     highlighted(pronunciation, words: line.pronunciationWords)
