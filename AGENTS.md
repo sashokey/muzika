@@ -17,6 +17,7 @@ Fix these items when the user explicitly asks. Remove each item after verifying 
 - Add more clearance around **Filter Songs** in the title bar, including space between the field and the divider below it.
 - In **Now Playing**, remove the hover effect from the seek bar between the artist information and the time readouts.
 - Remove the hover effect from the **Volume** slider as well.
+- In the bottom mini-player, remove the hover highlight around the playback seek bar.
 
 ## Naming, Versioning, and Distribution
 
