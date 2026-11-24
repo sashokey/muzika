@@ -22,6 +22,7 @@ Fix these items when the user explicitly asks. Remove each item after verifying 
   - Use the existing `Tests/Performance/run.sh` workflow with Release builds. Repeat section switching and automatic and manual lyric scrolling three times before and after the fix, using the same library, tracks, window size, and display refresh rate.
   - Keep local profiling to normal app usage. Never run synthetic workloads, stress tests, or CPU or GPU load generators on the user's Mac. Verification on the lowest-spec supported devices remains pending until an approved test environment is available.
   - Compare section switch latency, missed frames and frame intervals during motion, CPU time, GPU active time, and physical memory. Use Instruments to trace the bottleneck and compare matching visual states before and after to verify that the appearance is preserved.
+- In **Artists**, open an artist and select **Albums**. Add bottom padding below the artwork and the adjacent **Songs** count in the header, and leave a visible gap between the header divider and the first album row.
 
 ## Naming, Versioning, and Distribution
 
