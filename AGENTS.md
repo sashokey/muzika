@@ -4,9 +4,19 @@
 
 - Keep this file in English. Record agreed requirements, decision rationale, and verification results as work progresses. When the user clarifies a requirement, update the existing wording in the relevant section. Check this file against the latest messages and actual results before reporting completion.
 - Apply approvals to the controls discussed. Ask before choosing among materially different designs, moving adjacent buttons, changing their visual priority, or allocating a separate area. Compare the size and order of control groups with the approved layout.
-- Add new bug reports to the end of the queue. Verify the current fix before moving to the next report. When the user wants to revert styling independently, keep the fixes and styling in separate commits.
+- Add new bug reports to the end of [Open Bugs](#open-bugs). Verify the current fix before moving to the next report. When the user wants to revert styling independently, keep the fixes and styling in separate commits.
+- Record bug details as text. Keep screenshots outside the repository.
 - When fixing a shared hover effect, check its other uses proactively, including scrollable sections, Settings, search states, and player panels.
 - Git changes, publication, and releases require a corresponding request. Preserve the root `LICENSE` history. Follow the release procedure in Naming, Versioning, and Distribution and the commit checks in Testing.
+
+## Open Bugs
+
+Fix these items when the user explicitly asks. Remove each item after verifying its fix.
+
+- In **Songs**, remove the unwanted hover highlight on track table cells, such as those in the **Artist** column.
+- Add more clearance around **Filter Songs** in the title bar, including space between the field and the divider below it.
+- In **Now Playing**, remove the hover effect from the seek bar between the artist information and the time readouts.
+- Remove the hover effect from the **Volume** slider as well.
 
 ## Naming, Versioning, and Distribution
 
