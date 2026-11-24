@@ -57,6 +57,7 @@ private struct MainWindow: View {
     var body: some View {
         let navigation = Binding(get: { state.route }, set: { state.navigate($0) })
         let scanSchedule = state.scanSchedule
+        let playerAnimation: Animation? = reduceMotion ? nil : .easeInOut(duration: state.preferences.heroAnimations ? 0.22 : 0.14)
         ZStack {
             GeometryReader { geometry in
                 let inset = geometry.safeAreaInsets.top
@@ -75,23 +76,20 @@ private struct MainWindow: View {
             .allowsHitTesting(!state.showingPlayer)
 
             if state.showingPlayer, state.playback.current != nil {
-                NowPlayingView(state: state) { inset in
+                NowPlayingView(state: state, openingAnimation: playerAnimation) { inset in
                     if inset != nil || !state.showingPlayer { libraryToolbarInset = inset }
                 }
-                    .transition(.opacity)
+                    .transition(.asymmetric(insertion: .identity, removal: .opacity))
                     .zIndex(1)
             }
         }
         .onChange(of: state.route) { _, _ in libraryToolbarInset = nil }
-        .toolbar(removing: state.showingPlayer ? .title : nil)
-        .animation(
-            reduceMotion ? nil : .easeInOut(duration: state.preferences.heroAnimations ? 0.22 : 0.14),
-            value: state.showingPlayer
-        )
+        .toolbar(removing: .title)
+        .animation(playerAnimation, value: state.showingPlayer)
         .dynamicTypeSize(state.preferences.largerInterface ? max(typeSize, .xxLarge) : typeSize)
         .controlSize(state.preferences.largerInterface ? .large : controlSize)
         .frame(minWidth: 690, minHeight: 520)
-        .background(TransparentWindowTitlebar())
+        .background(WindowTitlebar(showsTitle: !state.showingPlayer))
         .overlay(alignment: .topTrailing) {
             if state.importing {
                 ProgressView("Opening audio…")
@@ -190,15 +188,67 @@ private struct MainWindow: View {
     }
 }
 
-private struct TransparentWindowTitlebar: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView { TitlebarView() }
+private struct WindowTitlebar: NSViewRepresentable {
+    var showsTitle: Bool
 
-    func updateNSView(_ view: NSView, context: Context) {}
+    func makeNSView(context: Context) -> TitlebarView { TitlebarView() }
 
-    private final class TitlebarView: NSView {
+    func updateNSView(_ view: TitlebarView, context: Context) {
+        view.showsTitle = showsTitle
+    }
+
+    final class TitlebarView: NSView {
+        var showsTitle = true {
+            didSet { if showsTitle != oldValue { accessory.isHidden = !showsTitle } }
+        }
+
+        private let accessory: NSTitlebarAccessoryViewController = {
+            let icon = NSImageView()
+            if let url = Bundle.main.url(forResource: "OkayegTitle", withExtension: "webp") {
+                icon.image = NSImage(contentsOf: url)
+            }
+            icon.imageScaling = .scaleProportionallyUpOrDown
+            icon.setAccessibilityElement(false)
+            NSLayoutConstraint.activate([
+                icon.widthAnchor.constraint(equalToConstant: 16),
+                icon.heightAnchor.constraint(equalToConstant: 16)
+            ])
+
+            let label = NSTextField(labelWithString: "💢 MUZIKA ❓")
+            label.font = .systemFont(ofSize: 13, weight: .semibold)
+            label.textColor = .secondaryLabelColor
+            label.setAccessibilityLabel("Okayeg 💢 MUZIKA ❓")
+
+            let stack = NSStackView(views: [icon, label])
+            stack.orientation = .horizontal
+            stack.alignment = .centerY
+            stack.spacing = 4
+            stack.edgeInsets = NSEdgeInsets(top: 0, left: 8, bottom: 0, right: 0)
+            stack.frame.size = stack.fittingSize
+
+            let accessory = NSTitlebarAccessoryViewController()
+            accessory.layoutAttribute = .left
+            accessory.view = stack
+            return accessory
+        }()
+
+        override func viewWillMove(toWindow newWindow: NSWindow?) {
+            if let window, window !== newWindow,
+               let index = window.titlebarAccessoryViewControllers.firstIndex(of: accessory) {
+                window.removeTitlebarAccessoryViewController(at: index)
+            }
+            super.viewWillMove(toWindow: newWindow)
+        }
+
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            window?.titlebarAppearsTransparent = true
+            guard let window else { return }
+            window.titlebarAppearsTransparent = true
+            window.titleVisibility = .hidden
+            if !window.titlebarAccessoryViewControllers.contains(accessory) {
+                window.addTitlebarAccessoryViewController(accessory)
+            }
+            accessory.isHidden = !showsTitle
         }
     }
 }

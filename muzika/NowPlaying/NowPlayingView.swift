@@ -3,6 +3,7 @@ import SwiftUI
 
 struct NowPlayingView: View {
     @Bindable var state: AppState
+    var openingAnimation: Animation?
     var reserveLibraryToolbar: (CGFloat?) -> Void = { _ in }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -11,6 +12,7 @@ struct NowPlayingView: View {
     @State private var palette = WavePalette.defaultPalette
     @State private var paletteTrackID: AudioTrack.ID?
     @State private var editingTime: Double?
+    @State private var windowPrepared = false
     @State private var visibleWindow = false
     @State private var fullscreenTopPadding: CGFloat?
     @State private var presentingAudioInfo = false
@@ -20,18 +22,27 @@ struct NowPlayingView: View {
         if let track = state.playback.current {
             let presentation = PlaybackPresentation(trackID: track.id, panel: state.panel)
             GeometryReader { proxy in
-                ZStack {
-                    background(track: track)
-                    playerLayout(track, size: proxy.size, windowTopInset: proxy.safeAreaInsets.top)
+                if windowPrepared {
+                    ZStack {
+                        background(track: track)
+                        playerLayout(track, size: proxy.size, windowTopInset: proxy.safeAreaInsets.top)
+                    }
+                    .transition(.opacity)
                 }
             }
+            .animation(openingAnimation, value: windowPrepared)
             .environment(\.colorScheme, .dark)
             .foregroundStyle(.white)
             .onChange(of: state.playback.currentEntryID) { _, _ in editingTime = nil }
             .background {
                 PlayerWindowProbe(
                     visibility: { visibleWindow = $0 }, topPadding: { fullscreenTopPadding = $0 },
-                    reserveLibraryToolbar: reserveLibraryToolbar
+                    reserveLibraryToolbar: reserveLibraryToolbar,
+                    prepared: {
+                        guard state.showingPlayer else { return false }
+                        windowPrepared = true
+                        return true
+                    }
                 )
             }
             .task(id: track.id) {
@@ -508,6 +519,7 @@ private struct PlayerWindowProbe: NSViewRepresentable {
     var visibility: (Bool) -> Void
     var topPadding: (CGFloat?) -> Void
     var reserveLibraryToolbar: (CGFloat?) -> Void
+    var prepared: () -> Bool
 
     func makeNSView(context: Context) -> PlayerWindowProbeView { PlayerWindowProbeView() }
 
@@ -515,6 +527,7 @@ private struct PlayerWindowProbe: NSViewRepresentable {
         view.visibility = visibility
         view.topPadding = topPadding
         view.reserveLibraryToolbar = reserveLibraryToolbar
+        view.prepared = prepared
         view.updateChrome()
     }
 
@@ -531,10 +544,12 @@ private final class PlayerWindowProbeView: NSView {
     var visibility: ((Bool) -> Void)?
     var topPadding: ((CGFloat?) -> Void)?
     var reserveLibraryToolbar: ((CGFloat?) -> Void)?
+    var prepared: (() -> Bool)?
     private var lastTopPadding: CGFloat?
     private var lastLibraryToolbarInset: CGFloat?
     private var layoutObservation: NSKeyValueObservation?
     private var updatingChrome = false
+    private var didPrepareWindow = false
     private let toolbar = PlayerWindowToolbar()
 
     override func viewDidMoveToWindow() {
@@ -574,6 +589,7 @@ private final class PlayerWindowProbeView: NSView {
         visibility = nil
         topPadding = nil
         reserveLibraryToolbar = nil
+        prepared = nil
         layoutObservation = nil
         NotificationCenter.default.removeObserver(self)
         toolbar.restore()
@@ -601,9 +617,14 @@ private final class PlayerWindowProbeView: NSView {
                 self.reserveLibraryToolbar?(toolbarInset)
             }
             let padding = self.fullscreenPadding
-            guard self.lastTopPadding != padding else { return }
-            self.lastTopPadding = padding
-            topPadding(padding)
+            if self.lastTopPadding != padding {
+                self.lastTopPadding = padding
+                topPadding(padding)
+            }
+            guard !self.didPrepareWindow, let window = self.window, !self.bounds.isEmpty else { return }
+            let viewTop = self.convert(self.bounds, to: nil).maxY
+            guard toolbarInset == nil || abs(viewTop - window.contentLayoutRect.maxY) <= 1 else { return }
+            self.didPrepareWindow = self.prepared?() == true
         }
     }
 

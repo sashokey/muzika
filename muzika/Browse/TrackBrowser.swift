@@ -360,7 +360,7 @@ struct BrowseTrackRows: View {
     let tracks: [AudioTrack]
     let playback: PlaybackController
     var limit: Int? = nil
-    var playbackArtworkIsVisible = false
+    var showsPlaybackEffects = false
     var beforePlay: (AudioTrack) -> Void = { _ in }
 
     @Environment(Preferences.self) private var preferences: Preferences?
@@ -379,9 +379,9 @@ struct BrowseTrackRows: View {
                 BrowseTrackRow(library: library, track: track)
             }
             .buttonStyle(.plain)
-            .modifier(HomeArtworkPlaybackModifier(
-                library: library, track: track, tracks: tracks, playback: playback,
-                compact: true, isVisible: playbackArtworkIsVisible
+            .modifier(ArtworkPlaybackModifier(
+                library: library, target: .track(track, queue: tracks), playback: playback,
+                compact: true, effectsTrack: showsPlaybackEffects ? track : nil, beforePlay: beforePlay
             ))
             .contextMenu {
                 PlayTracksMenu(tracks: [track], playback: playback)
@@ -427,7 +427,7 @@ struct BrowseSongGrid: View {
     let playback: PlaybackController
     var displayAlbum = false
     var limit: Int? = nil
-    var playbackArtworkIsVisible = false
+    var showsPlaybackEffects = false
     var beforePlay: (AudioTrack) -> Void = { _ in }
 
     @Environment(Preferences.self) private var preferences: Preferences?
@@ -458,9 +458,9 @@ struct BrowseSongGrid: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .modifier(HomeArtworkPlaybackModifier(
-                    library: library, track: track, tracks: tracks, playback: playback,
-                    compact: false, isVisible: playbackArtworkIsVisible
+                .modifier(ArtworkPlaybackModifier(
+                    library: library, target: .track(track, queue: tracks), playback: playback,
+                    compact: false, effectsTrack: showsPlaybackEffects ? track : nil, beforePlay: beforePlay
                 ))
                 .contextMenu {
                     PlayTracksMenu(tracks: [track], playback: playback)
@@ -487,23 +487,41 @@ struct HomeArtworkPlaybackState {
     }
 }
 
+enum ArtworkPlaybackTarget {
+    case track(AudioTrack, queue: [AudioTrack])
+    case group([AudioTrack])
+
+    func contains(_ track: AudioTrack?) -> Bool {
+        guard let track else { return false }
+        switch self {
+        case .track(let song, _):
+            return song.id == track.id
+        case .group(let tracks):
+            return tracks.contains { $0.id == track.id }
+        }
+    }
+}
+
 @MainActor
-private struct HomeArtworkPlaybackModifier: ViewModifier {
+struct ArtworkPlaybackModifier: ViewModifier {
     let library: LibraryStore
-    let track: AudioTrack
-    let tracks: [AudioTrack]
+    let target: ArtworkPlaybackTarget
     let playback: PlaybackController
     let compact: Bool
-    let isVisible: Bool
+    var effectsTrack: AudioTrack? = nil
+    var beforePlay: (AudioTrack) -> Void = { _ in }
+
+    @Environment(\.libraryPlaybackEffectsVisible) private var effectsVisible
 
     func body(content: Content) -> some View {
-        if isVisible {
-            let state = HomeArtworkPlaybackState(isCurrent: playback.current?.id == track.id, isPlaying: playback.playing)
+        if effectsVisible {
+            let isCurrent = target.contains(playback.current)
+            let state = HomeArtworkPlaybackState(isCurrent: isCurrent, isPlaying: isCurrent && playback.playing)
             let title: LocalizedStringResource = state.showsPlaying ? "Pause" : "Play"
             content
                 .overlay(alignment: compact ? .leading : .top) {
-                    let artwork = HomeArtworkPlayback(
-                        library: library, track: track, playback: playback, state: state,
+                    let artwork = ArtworkPlaybackControl(
+                        library: library, effectsTrack: effectsTrack, playback: playback, state: state,
                         title: title, compact: compact, action: playOrPause
                     )
                     if compact {
@@ -521,18 +539,24 @@ private struct HomeArtworkPlaybackModifier: ViewModifier {
     }
 
     private func playOrPause() {
-        if playback.current?.id == track.id {
+        if target.contains(playback.current) {
             playback.togglePlayback()
-        } else {
-            playback.play(track, in: tracks)
+            return
+        }
+        switch target {
+        case .track(let track, let queue):
+            beforePlay(track)
+            playback.play(track, in: queue)
+        case .group(let tracks):
+            playback.play(tracks, shuffled: false)
         }
     }
 }
 
 @MainActor
-private struct HomeArtworkPlayback: View {
+private struct ArtworkPlaybackControl: View {
     let library: LibraryStore
-    let track: AudioTrack
+    let effectsTrack: AudioTrack?
     let playback: PlaybackController
     let state: HomeArtworkPlaybackState
     let title: LocalizedStringResource
@@ -549,7 +573,7 @@ private struct HomeArtworkPlayback: View {
         let showsControl = isHovered || focused
         ZStack(alignment: .center) {
             Color.clear.allowsHitTesting(false)
-            if state.animates(visible: visible, reduceMotion: reduceMotion) {
+            if let track = effectsTrack, state.animates(visible: visible, reduceMotion: reduceMotion) {
                 WaveBackground(
                     palette: palette, isActive: true, playback: playback,
                     framesPerSecond: WaveClock.artworkFramesPerSecond
@@ -566,7 +590,7 @@ private struct HomeArtworkPlayback: View {
                         }
                     }
             }
-            if state.showsPlaying, !showsControl {
+            if effectsTrack != nil, state.showsPlaying, !showsControl {
                 ArtworkSpectrumBadge(playback: playback, diameter: compact ? 16 : 22)
                     .padding(compact ? 2 : 6)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)

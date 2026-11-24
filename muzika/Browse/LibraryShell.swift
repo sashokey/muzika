@@ -485,6 +485,9 @@ struct BrowseGroupList: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .modifier(ArtworkPlaybackModifier(
+                    library: library, target: .group(group.tracks), playback: playback, compact: true
+                ))
                 .contextMenu {
                     Button("Open", systemImage: "arrow.right") { open(group.route) }
                     Divider()
@@ -529,6 +532,9 @@ struct BrowseGroupGrid: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(group.title)
                 .accessibilityHint(group.subtitle)
+                .modifier(ArtworkPlaybackModifier(
+                    library: library, target: .group(group.tracks), playback: playback, compact: false
+                ))
                 .contextMenu {
                     Button("Open", systemImage: "arrow.right") { open(group.route) }
                     Divider()

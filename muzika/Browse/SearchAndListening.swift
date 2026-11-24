@@ -438,7 +438,7 @@ struct ListeningBrowser: View {
 
             ScrollView {
                 switch route {
-                case .home: home
+                case .home: home.padding(.trailing, 26)
                 case .history: timeline
                 case .statistics: statistics(since: period.start)
                 case .rewind: rewind
@@ -468,7 +468,7 @@ struct ListeningBrowser: View {
                     }
                     BrowseSongGrid(
                         library: library, tracks: recent, playback: playback, displayAlbum: true, limit: 6,
-                        playbackArtworkIsVisible: playbackArtworkIsVisible
+                        showsPlaybackEffects: playbackArtworkIsVisible
                     )
                 }
             } else if history.events.isEmpty, history.continueListening, let resumable {
@@ -546,7 +546,7 @@ struct ListeningBrowser: View {
             VStack(spacing: 0) {
                 BrowseTrackRows(
                     library: library, tracks: tracks, playback: playback, limit: 6,
-                    playbackArtworkIsVisible: playbackArtworkIsVisible
+                    showsPlaybackEffects: playbackArtworkIsVisible
                 )
             }
         }
@@ -622,16 +622,21 @@ struct ListeningBrowser: View {
                     statistic("Artists", value: summary.artistCount.formatted(), symbol: "music.mic")
                 }
                 if !ranked.isEmpty {
+                    let rankedTracks = ranked.map(\.track)
                     Text("Top Songs").font(.title2.bold()).accessibilityAddTraits(.isHeader)
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(ranked.prefix(50))) { result in
                             HStack {
                                 Button {
-                                    playback.play(result.track, in: ranked.map(\.track))
+                                    playback.play(result.track, in: rankedTracks)
                                 } label: {
                                     BrowseTrackRow(library: library, track: result.track)
                                 }
                                 .buttonStyle(.plain)
+                                .modifier(ArtworkPlaybackModifier(
+                                    library: library, target: .track(result.track, queue: rankedTracks),
+                                    playback: playback, compact: true
+                                ))
                                 Text("Plays: \(result.count)")
                                     .frame(minWidth: 60, alignment: .trailing)
                                     .foregroundStyle(.secondary)

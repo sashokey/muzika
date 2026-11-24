@@ -87,7 +87,7 @@ enum PerformanceProbe {
 
     static func main() async throws {
         _ = NSApplication.shared
-        if showsWindow { NSApp.setActivationPolicy(.accessory) }
+        NSApp.setActivationPolicy(.accessory)
         let report = URL(filePath: CommandLine.arguments[2])
         let repetitions = max(1, Int(CommandLine.arguments[3]) ?? 3)
         let actions = try benchmarkActions()
@@ -302,11 +302,13 @@ enum PerformanceProbe {
             window.contentView = host
             window.setContentSize(size)
             host.frame.size = size
-            if PerformanceProbe.showsWindow {
-                window.title = "MUZIKA? Performance Fixture"
-                window.center()
-                window.orderFrontRegardless()
+            window.title = "MUZIKA? Performance Fixture"
+            if !PerformanceProbe.showsWindow {
+                window.alphaValue = 0
+                window.ignoresMouseEvents = true
             }
+            window.center()
+            window.orderFrontRegardless()
         }
 
         isolated deinit { window.orderOut(nil) }
