@@ -13,18 +13,18 @@
 
 Fix these items when the user explicitly asks. Remove each item after verifying its fix.
 
-- In **Songs**, remove the unwanted hover highlight on track table cells, such as those in the **Artist** column.
-- Add more clearance around **Filter Songs** in the title bar, including space between the field and the divider below it.
-- In **Now Playing**, remove the hover effect from the seek bar between the artist information and the time readouts.
-- Remove the hover effect from the **Volume** slider as well.
-- In the bottom mini-player, remove the hover highlight around the playback seek bar.
-- Profile stutters when switching sections and low frame rates in the lyrics view. Identify and fix the root causes. Where the implementation approach is already optimal, profile it to find targeted optimizations. Keep the app lightweight and responsive, with smooth section transitions and lyrics updates even on the lowest-spec supported devices. Preserve the existing visual design throughout.
+- [P2] In **Songs**, remove the unwanted hover highlight on track table cells, such as those in the **Artist** column.
+- [P2] Add more clearance around **Filter Songs** in the title bar, including space between the field and the divider below it.
+- [P2] In **Now Playing**, remove the hover effect from the seek bar between the artist information and the time readouts.
+- [P2] Remove the hover effect from the **Volume** slider as well.
+- [P2] In the bottom mini-player, remove the hover highlight around the playback seek bar.
+- [P1] Profile stutters when switching sections and low frame rates in the lyrics view. Identify and fix the root causes. Where the implementation approach is already optimal, profile it to find targeted optimizations. Keep the app lightweight and responsive, with smooth section transitions and lyrics updates even on the lowest-spec supported devices. Preserve the existing visual design throughout.
   - Use the existing `Tests/Performance/run.sh` workflow with Release builds. Repeat section switching and automatic and manual lyric scrolling three times before and after the fix, using the same library, tracks, window size, and display refresh rate.
   - Keep local profiling to normal app usage. Never run synthetic workloads, stress tests, or CPU or GPU load generators on the user's Mac. Verification on the lowest-spec supported devices remains pending until an approved test environment is available.
   - Compare section switch latency, missed frames and frame intervals during motion, CPU time, GPU active time, and physical memory. Use Instruments to trace the bottleneck and compare matching visual states before and after to verify that the appearance is preserved.
-- In **Artists**, open an artist and select **Albums**. Add bottom padding below the artwork and the adjacent **Songs** count in the header, and leave a visible gap between the header divider and the first album row.
-- In **Up Next**, extend the hover highlight across the full width of each queue row. Match the gap between the artwork and the left edge of the highlight to the gaps above and below the artwork.
-- Reproduce and fix a rare playback failure. The **Audio files** alert reads `Couldn't play это, наверное, здорово. The operation couldn’t be completed. (OSStatus error -39.)`. The alert appeared after switching to `Самый живой (feat. курящих нет) (Jumpstyle)` by Kopf.rt, курящих нет (FLAC), with **Shuffle** on, **Repeat Off**, and **Up Next** open in full-window **Now Playing**.
+- [P2] In **Artists**, open an artist and select **Albums**. Add bottom padding below the artwork and the adjacent **Songs** count in the header, and leave a visible gap between the header divider and the first album row.
+- [P2] In **Up Next**, extend the hover highlight across the full width of each queue row. Match the gap between the artwork and the left edge of the highlight to the gaps above and below the artwork.
+- [P1] Reproduce and fix a rare playback failure. The **Audio files** alert reads `Couldn't play это, наверное, здорово. The operation couldn’t be completed. (OSStatus error -39.)`. The alert appeared after switching to `Самый живой (feat. курящих нет) (Jumpstyle)` by Kopf.rt, курящих нет (FLAC), with **Shuffle** on, **Repeat Off**, and **Up Next** open in full-window **Now Playing**.
 
 ## Naming, Versioning, and Distribution
 
