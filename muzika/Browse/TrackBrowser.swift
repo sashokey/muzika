@@ -75,11 +75,7 @@ struct TrackBrowserPage: View {
 
     var body: some View {
         let onlyAlbums = !relatedAlbums.isEmpty && !showsSongs
-        let terms = AudioTrack.artistKey(query).split(whereSeparator: \.isWhitespace).map(String.init)
-        let matches = terms.isEmpty && filters == .init() ? tracks : tracks.filter {
-            $0.matches(tokens: terms) && filters.matches($0)
-        }
-        let selectedTracks = !sort.descending && sort.key == presorted ? matches : sort.sorted(matches)
+        let selectedTracks = onlyAlbums && navigate != nil ? [] : sortedMatchingTracks
         let results = ZStack {
             if onlyAlbums, let navigate {
                 relatedAlbumResults(navigate: navigate).transition(.opacity)
@@ -99,6 +95,14 @@ struct TrackBrowserPage: View {
         }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: onlyAlbums)
         .windowLibraryFilter(text: $query, prompt: onlyAlbums ? "Filter Albums" : "Filter Songs")
+    }
+
+    private var sortedMatchingTracks: [AudioTrack] {
+        let terms = AudioTrack.artistKey(query).split(whereSeparator: \.isWhitespace).map(String.init)
+        let matches = terms.isEmpty && filters == .init() ? tracks : tracks.filter {
+            $0.matches(tokens: terms) && filters.matches($0)
+        }
+        return !sort.descending && sort.key == presorted ? matches : sort.sorted(matches)
     }
 
     private func header(onlyAlbums: Bool, selectedTracks: [AudioTrack]) -> some View {

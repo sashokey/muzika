@@ -124,8 +124,8 @@ final class AppState {
     }
 
     func closePlayer() {
-        showingPlayer = false
-        showingInfo = false
+        if showingPlayer { showingPlayer = false }
+        if showingInfo { showingInfo = false }
     }
 
     func dismiss() {

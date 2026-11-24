@@ -263,7 +263,8 @@ struct NowPlayingView: View {
                         document: document, position: { state.playback.livePosition }, playing: state.playback.playing,
                         offset: state.preferences.lyricsOffset, textSize: state.preferences.lyricsSize,
                         blur: state.preferences.lyricsBlur && (!reduceTransparency || state.preferences.forceBlur),
-                        seek: state.playback.seek(to:), topOverflow: topOverflow
+                        seek: state.playback.seek(to:), topOverflow: topOverflow,
+                        positionSnapshot: { state.playback.position }
                     )
                     .id(trackID)
                     .transition(.opacity)

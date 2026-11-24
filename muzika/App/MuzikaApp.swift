@@ -46,7 +46,7 @@ private final class AudioFileOpenDelegate: NSObject, NSApplicationDelegate {
 }
 
 private struct MainWindow: View {
-    @Bindable var state: AppState
+    let state: AppState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.controlSize) private var controlSize
@@ -55,15 +55,16 @@ private struct MainWindow: View {
     @State private var libraryToolbarInset: CGFloat?
 
     var body: some View {
-        let navigation = Binding(get: { state.route }, set: { state.navigate($0) })
         let scanSchedule = state.scanSchedule
         let playerAnimation: Animation? = reduceMotion ? nil : .easeInOut(duration: state.preferences.heroAnimations ? 0.22 : 0.14)
         ZStack {
             GeometryReader { geometry in
                 let inset = geometry.safeAreaInsets.top
                 LibraryShell(
-                    library: state.library, playback: state.playback, history: state.history,
-                    route: navigation, goBack: state.back, playbackArtworkIsVisible: !state.showingPlayer
+                    state: state, playbackArtworkIsVisible: !state.showingPlayer,
+                    onRouteChange: {
+                        if libraryToolbarInset != nil { libraryToolbarInset = nil }
+                    }
                 ) {
                     PlayerCapsule(state: state)
                 } settings: {
@@ -83,7 +84,6 @@ private struct MainWindow: View {
                     .zIndex(1)
             }
         }
-        .onChange(of: state.route) { _, _ in libraryToolbarInset = nil }
         .toolbar(removing: .title)
         .animation(playerAnimation, value: state.showingPlayer)
         .dynamicTypeSize(state.preferences.largerInterface ? max(typeSize, .xxLarge) : typeSize)

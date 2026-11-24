@@ -2,7 +2,7 @@ import AppKit
 import ImageIO
 import SwiftUI
 
-enum LibraryRoute: Hashable {
+nonisolated enum LibraryRoute: Hashable, Sendable {
     case home
     case search
     case recentlyAdded
@@ -70,7 +70,7 @@ enum LibraryRoute: Hashable {
     }
 }
 
-enum BrowseSort: String, CaseIterable, Identifiable {
+nonisolated enum BrowseSort: String, CaseIterable, Identifiable, Sendable {
     case title = "Title"
     case artist = "Artist"
     case album = "Album"
@@ -141,7 +141,7 @@ enum BrowseSort: String, CaseIterable, Identifiable {
     }
 }
 
-struct BrowseGroup: Identifiable {
+nonisolated struct BrowseGroup: Identifiable, Sendable {
     private static let artistSeparator = try! NSRegularExpression(
         pattern: #"\s*(?:,|;|&)\s*|\s+x\s+|\s+(?:feat(?:uring|ured|ure)?|ft|with)\.?(?=\s|$)\s*"#,
         options: .caseInsensitive
@@ -460,20 +460,26 @@ struct BrowseArtwork: View {
                 }
                 guard let data = await library.artwork(for: track), !Task.isCancelled else { return }
                 let size = pixelSize
-                let thumbnail = await Task.detached(priority: .utility) {
-                    guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil as CGImage? }
+                let worker = Task.detached(priority: .utility) {
+                    guard !Task.isCancelled, let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil as CGImage? }
                     let options = [
                         kCGImageSourceCreateThumbnailFromImageAlways: true,
                         kCGImageSourceCreateThumbnailWithTransform: true,
                         kCGImageSourceThumbnailMaxPixelSize: size
                     ] as CFDictionary
                     return CGImageSourceCreateThumbnailAtIndex(source, 0, options)
-                }.value
+                }
+                let thumbnail = await withTaskCancellationHandler {
+                    await worker.value
+                } onCancel: {
+                    worker.cancel()
+                }
                 guard let thumbnail, !Task.isCancelled else { return }
                 let artwork = NSImage(cgImage: thumbnail, size: NSSize(width: thumbnail.width, height: thumbnail.height))
                 Self.cache.setObject(artwork, forKey: key, cost: thumbnail.bytesPerRow * thumbnail.height)
                 image = artwork
             }
+            .onDisappear { image = nil }
     }
 }
 

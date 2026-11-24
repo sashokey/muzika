@@ -218,6 +218,9 @@ enum PerformanceProbe {
                     throw CocoaError(.validationMissingMandatoryProperty)
                 }
             },
+            Action("lyrics.visible_active_line") { fixture in
+                try fixture.verifyVisibleLyricInk()
+            },
             Action("lyrics.manual_scroll") { fixture in
                 let scroll = try fixture.lyricsScrollView()
                 let before = scroll.contentView.bounds.origin
@@ -321,6 +324,29 @@ enum PerformanceProbe {
                 $0.convert($0.bounds, to: host).minX >= host.bounds.width * 0.4 && !($0.documentView is NSTableView)
             }) else { throw CocoaError(.validationMissingMandatoryProperty) }
             return scroll
+        }
+
+        func verifyVisibleLyricInk() throws {
+            let clip = try lyricsScrollView().contentView
+            guard let layer = clip.layer else { throw CocoaError(.validationMissingMandatoryProperty) }
+            let width = Int(clip.bounds.width.rounded(.down))
+            let height = Int(clip.bounds.height.rounded(.down))
+            guard width > 0, height > 0,
+                  let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
+                                          bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+                  let bytes = context.data?.assumingMemoryBound(to: UInt8.self) else {
+                throw CocoaError(.validationMissingMandatoryProperty)
+            }
+            context.translateBy(x: 0, y: CGFloat(height))
+            context.scaleBy(x: 1, y: -1)
+            context.translateBy(x: -layer.bounds.minX, y: -layer.bounds.minY)
+            layer.render(in: context)
+            for y in Int(Double(height) * 0.27)..<Int(Double(height) * 0.53) {
+                let row = bytes + y * context.bytesPerRow
+                if stride(from: 3, to: width * 4, by: 4).contains(where: { row[$0] >= 240 }) { return }
+            }
+            throw CocoaError(.validationMissingMandatoryProperty)
         }
 
         func renderWave() throws {
