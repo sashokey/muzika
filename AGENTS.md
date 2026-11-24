@@ -24,7 +24,7 @@ Fix these items when the user explicitly asks. Remove each item after verifying 
   - Compare section switch latency, missed frames and frame intervals during motion, CPU time, GPU active time, and physical memory. Use Instruments to trace the bottleneck and compare matching visual states before and after to verify that the appearance is preserved.
 - In **Artists**, open an artist and select **Albums**. Add bottom padding below the artwork and the adjacent **Songs** count in the header, and leave a visible gap between the header divider and the first album row.
 - In **Up Next**, extend the hover highlight across the full width of each queue row. Match the gap between the artwork and the left edge of the highlight to the gaps above and below the artwork.
-- Reproduce and fix a rare playback failure. The **Audio files** alert reads `Couldn't play это, наверное, здорово. The operation couldn’t be completed. (OSStatus error -39.)`.
+- Reproduce and fix a rare playback failure. The **Audio files** alert reads `Couldn't play это, наверное, здорово. The operation couldn’t be completed. (OSStatus error -39.)`. The alert appeared after switching to `Самый живой (feat. курящих нет) (Jumpstyle)` by Kopf.rt, курящих нет (FLAC), with **Shuffle** on, **Repeat Off**, and **Up Next** open in full-window **Now Playing**.
 
 ## Naming, Versioning, and Distribution
 
