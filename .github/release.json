@@ -1,6 +1,6 @@
 {
-  "version": "v5",
+  "version": "v6",
   "draft": false,
   "prerelease": false,
-  "notes": "- Removed unwanted hover highlights from Songs table cells, both playback position sliders, and the Volume slider.\n- Improved spacing around Filter Songs and between the artist's Albums header and the first album.\n- Extended Up Next highlights across the full width of queue rows and aligned the spacing around artwork.\n- Fixed a false playback error at the end of some MP3 files and preserved the final decoded audio.\n- Documented the scenarios and measurements for investigating interface performance.\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
+  "notes": "- Restored the title bar filter to 28 pt high and added 4 pt of space above and below it in every section that uses it.\n- Kept the sidebar and window buttons aligned when switching sections.\n- Documented which local builds and audio tests require access to macOS services.\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
 }

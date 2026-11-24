@@ -193,7 +193,6 @@ private struct MainWindow: View {
 private struct WindowLibraryFilter {
     let text: Binding<String>
     let prompt: LocalizedStringResource
-    let usesCompactHeight: Bool
 }
 
 private struct WindowLibraryFilterKey: PreferenceKey {
@@ -205,13 +204,8 @@ private struct WindowLibraryFilterKey: PreferenceKey {
 }
 
 extension View {
-    func windowLibraryFilter(
-        text: Binding<String>, prompt: LocalizedStringResource, usesCompactHeight: Bool = false
-    ) -> some View {
-        preference(
-            key: WindowLibraryFilterKey.self,
-            value: WindowLibraryFilter(text: text, prompt: prompt, usesCompactHeight: usesCompactHeight)
-        )
+    func windowLibraryFilter(text: Binding<String>, prompt: LocalizedStringResource) -> some View {
+        preference(key: WindowLibraryFilterKey.self, value: WindowLibraryFilter(text: text, prompt: prompt))
     }
 }
 
@@ -226,10 +220,16 @@ private struct WindowTitlebar: NSViewRepresentable {
     }
 
     final class TitlebarView: NSView {
+        private static let filterPadding: CGFloat = 4
         private var showsTitle = true
         private var filter: WindowLibraryFilter?
-        private let filterGlass = NSGlassEffectView()
-        private lazy var filterGlassHeight = filterGlass.heightAnchor.constraint(equalToConstant: 28)
+        private let titlebarPadding: NSTitlebarAccessoryViewController = {
+            let accessory = NSTitlebarAccessoryViewController()
+            accessory.layoutAttribute = .bottom
+            accessory.automaticallyAdjustsSize = false
+            accessory.view = NSView(frame: NSRect(x: 0, y: 0, width: 0, height: TitlebarView.filterPadding))
+            return accessory
+        }()
         private lazy var filterField: NSSearchField = {
             let field = NSSearchField()
             field.target = self
@@ -241,8 +241,10 @@ private struct WindowTitlebar: NSViewRepresentable {
         }()
         private lazy var filterAccessory: NSTitlebarAccessoryViewController = {
             let filterWidth: CGFloat = 325
+            let filterHeight: CGFloat = 28
             let leadingInset: CGFloat = 18
-            let glass = filterGlass
+            let glass = NSGlassEffectView()
+            glass.cornerRadius = filterHeight / 2
             glass.effectIsInteractive = true
             glass.translatesAutoresizingMaskIntoConstraints = false
 
@@ -255,8 +257,8 @@ private struct WindowTitlebar: NSViewRepresentable {
             NSLayoutConstraint.activate([
                 glass.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: leadingInset),
                 glass.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-                glass.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-                filterGlassHeight,
+                glass.topAnchor.constraint(equalTo: container.topAnchor, constant: TitlebarView.filterPadding),
+                glass.heightAnchor.constraint(equalToConstant: filterHeight),
                 filterField.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 6),
                 filterField.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -6),
                 filterField.centerYAnchor.constraint(equalTo: content.centerYAnchor)
@@ -310,6 +312,7 @@ private struct WindowTitlebar: NSViewRepresentable {
             if let window, window !== newWindow {
                 setAccessory(accessory, visible: false, in: window)
                 setAccessory(filterAccessory, visible: false, in: window)
+                setAccessory(titlebarPadding, visible: false, in: window)
             }
             super.viewWillMove(toWindow: newWindow)
         }
@@ -325,10 +328,8 @@ private struct WindowTitlebar: NSViewRepresentable {
 
         private func updateAccessories(in window: NSWindow) {
             setAccessory(accessory, visible: showsTitle, in: window)
+            setAccessory(titlebarPadding, visible: showsTitle, in: window)
             if let filter {
-                let height: CGFloat = filter.usesCompactHeight ? 24 : 28
-                filterGlassHeight.constant = height
-                filterGlass.cornerRadius = height / 2
                 let prompt = String(localized: filter.prompt)
                 filterField.placeholderString = prompt
                 filterField.setAccessibilityLabel(prompt)

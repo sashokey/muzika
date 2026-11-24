@@ -98,9 +98,7 @@ struct TrackBrowserPage: View {
             }
         }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: onlyAlbums)
-        .windowLibraryFilter(
-            text: $query, prompt: onlyAlbums ? "Filter Albums" : "Filter Songs", usesCompactHeight: !onlyAlbums
-        )
+        .windowLibraryFilter(text: $query, prompt: onlyAlbums ? "Filter Albums" : "Filter Songs")
     }
 
     private func header(onlyAlbums: Bool, selectedTracks: [AudioTrack]) -> some View {
