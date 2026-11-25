@@ -48,6 +48,9 @@ struct NowPlayingView: View {
                     prepared: {
                         guard state.showingPlayer else { return false }
                         windowPrepared = true
+                        #if MUZIKA_DEV_LOGS
+                        MuzikaTrace.event(.player, "player.prepared", "opening_animation=\(openingAnimation != nil) panel=\(MuzikaTrace.panelName(state.panel))")
+                        #endif
                         return true
                     }
                 )
@@ -60,16 +63,29 @@ struct NowPlayingView: View {
                 guard !Task.isCancelled else { return }
                 palette = value
                 paletteTrackID = track.id
+                #if MUZIKA_DEV_LOGS
+                MuzikaTrace.event(.player, "cover.palette.ready", "reduce_motion=\(reduceMotion)")
+                #endif
             }
             .task(id: presentation) {
                 guard presentation.panel == .lyrics else { return }
+                #if MUZIKA_DEV_LOGS
+                let loadStarted = CACurrentMediaTime()
+                MuzikaTrace.event(.lyrics, "lyrics.load.begin")
+                #endif
                 if lyricsLoad?.trackID != track.id {
                     lyricsLoad = LyricsLoad(trackID: track.id, status: .loading)
                 }
                 do {
                     let document = try await state.library.lyrics(for: track)
+                    #if MUZIKA_DEV_LOGS
+                    MuzikaTrace.event(.lyrics, "lyrics.load.result", "found=\(document != nil) timed=\(document?.isTimed ?? false) lines=\(document?.lines.count ?? 0) cancelled=\(Task.isCancelled) elapsed_ms=\(((CACurrentMediaTime() - loadStarted) * 1000).rounded())")
+                    #endif
                     if !Task.isCancelled { lyricsLoad = LyricsLoad(trackID: track.id, status: .ready(document)) }
                 } catch {
+                    #if MUZIKA_DEV_LOGS
+                    MuzikaTrace.event(.lyrics, "lyrics.load.failed", "cancelled=\(Task.isCancelled)")
+                    #endif
                     if !Task.isCancelled { lyricsLoad = LyricsLoad(trackID: track.id, status: .failed) }
                 }
             }
@@ -227,9 +243,12 @@ struct NowPlayingView: View {
                     .accessibilityHidden(true)
                 }
                 .lineLimit(1)
+                .padding(.horizontal, hoverOutset.width)
+                .padding(.vertical, hoverOutset.height)
+                .contentShape(Capsule())
             }
             .buttonStyle(.plain)
-            .liquidGlassHover(in: Capsule(), outset: hoverOutset)
+            .liquidGlassHover(in: Capsule(), outset: .zero)
             .help("Audio info")
             .accessibilityLabel("Audio info, \(track.quality)")
             .popover(isPresented: $presentingAudioInfo) {
@@ -247,6 +266,8 @@ struct NowPlayingView: View {
                 .padding(15)
                 .frame(minWidth: 180)
             }
+            .padding(.horizontal, -hoverOutset.width)
+            .padding(.vertical, -hoverOutset.height)
             Spacer(minLength: 2)
             Text("-" + elapsedLabel(max(0, track.duration - position))).monospacedDigit()
         }
@@ -331,9 +352,18 @@ private struct QueuePanel: View {
     let library: LibraryStore
     @Environment(\.layoutDirection) private var layoutDirection
     @ScaledMetric(relativeTo: .caption) private var headerHeight = 28.0
+    @State private var artworkPage = 0
+
+    private static let artworkPageSize = 8
+    private static let artworkLookahead = 32
+    #if MUZIKA_DEV_LOGS
+    @State private var scrollState = ScrollPhase.idle
+    #endif
 
     var body: some View {
         let upcoming = visibleQueue
+        let prefetch = artworkWindow(in: upcoming)
+        let hasCurrent = playback.current != nil
         let leftToRight = layoutDirection == .leftToRight
         VStack(alignment: .leading, spacing: 14) {
             HStack {
@@ -349,7 +379,10 @@ private struct QueuePanel: View {
                 List {
                     if let current = playback.current {
                         Section {
-                            queueLabel(current, symbol: playback.playing ? "speaker.wave.2.fill" : "pause.fill")
+                            QueueTrackLabel(
+                                library: library, track: current,
+                                symbol: playback.playing ? "speaker.wave.2.fill" : "pause.fill"
+                            )
                                 .id(playback.currentEntryID)
                         } header: {
                             sectionHeader("Now Playing")
@@ -357,15 +390,9 @@ private struct QueuePanel: View {
                     }
                     Section {
                         ForEach(upcoming) { entry in
-                            Button {
+                            QueueTrackRow(library: library, track: entry.track) {
                                 playback.select(entry)
-                            } label: {
-                                queueLabel(entry.track)
-                                    .padding(.horizontal, 4)
-                                    .contentShape(Rectangle())
                             }
-                            .buttonStyle(.plain)
-                            .liquidGlassHover(outset: CGSize(width: 0, height: 1))
                             .listRowInsets(.leading, leftToRight ? -8 : -9)
                             .listRowInsets(.trailing, leftToRight ? -9 : -8)
                             .contextMenu {
@@ -401,6 +428,25 @@ private struct QueuePanel: View {
                         sectionHeader("Queue")
                     }
                 }
+                #if MUZIKA_DEV_LOGS
+                .onScrollPhaseChange { previous, phase, context in
+                    scrollState = phase
+                    MuzikaTrace.event(.queue, "queue.scroll.phase",
+                        "from=\(previous) to=\(phase) offset_pt=\(context.geometry.contentOffset.y) viewport_pt=\(context.geometry.containerSize.height) content_pt=\(context.geometry.contentSize.height)")
+                }
+                #endif
+                .onScrollGeometryChange(for: Int.self) { geometry in
+                    let headerSpace = headerHeight * (hasCurrent ? 2 : 1)
+                    let rowCount = upcoming.count + (hasCurrent ? 1 : 0)
+                    guard rowCount > 0, geometry.contentSize.height > headerSpace else { return 0 }
+                    let rowHeight = (geometry.contentSize.height - headerSpace) / CGFloat(rowCount)
+                    let queueOffset = geometry.contentOffset.y + geometry.contentInsets.top - headerSpace
+                        - (hasCurrent ? rowHeight : 0)
+                    let first = min(max(0, upcoming.count - 1), Int(max(0, queueOffset / rowHeight)))
+                    return first / Self.artworkPageSize
+                } action: { _, page in
+                    artworkPage = page
+                }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .environment(\.defaultMinListHeaderHeight, headerHeight)
@@ -426,6 +472,44 @@ private struct QueuePanel: View {
         }
         .padding(16)
         .background(.black.opacity(0.23), in: .rect(cornerRadius: 16))
+        .task(id: prefetch.map(\.id), priority: .utility) {
+            await prefetchArtwork(prefetch)
+        }
+        #if MUZIKA_DEV_LOGS
+        .background {
+            AnimationTraceProbe(area: .queue,
+                state: "revision=\(playback.diagnosticQueueRevision) total=\(playback.queue.count) upcoming=\(upcoming.count) locked=\(playback.queueLocked) scroll=\(scrollState) header_pt=\(headerHeight)")
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+        .onAppear { MuzikaTrace.event(.queue, "queue.panel.visible", "upcoming=\(upcoming.count)") }
+        .onDisappear { MuzikaTrace.event(.queue, "queue.panel.hidden") }
+        #endif
+    }
+
+    private func artworkWindow(in upcoming: [QueueEntry]) -> [AudioTrack] {
+        guard !upcoming.isEmpty else { return [] }
+        let lastPage = (upcoming.count - 1) / Self.artworkPageSize
+        let first = min(artworkPage, lastPage) * Self.artworkPageSize
+        let end = min(upcoming.count, first + Self.artworkLookahead)
+        let behind = max(0, first - Self.artworkPageSize * 2)
+        var seen = Set<AudioTrack.ID>()
+        return (upcoming[first..<end].map(\.track) + upcoming[behind..<first].map(\.track))
+            .filter { seen.insert($0.id).inserted }
+    }
+
+    private func prefetchArtwork(_ tracks: [AudioTrack]) async {
+        let library = library
+        for start in stride(from: 0, to: tracks.count, by: 4) {
+            guard !Task.isCancelled else { return }
+            await withTaskGroup(of: Void.self) { group in
+                for track in tracks[start..<min(start + 4, tracks.count)] {
+                    group.addTask {
+                        _ = await BrowseArtwork.loadThumbnail(for: track, in: library, pixelSize: QueueTrackLabel.artworkPixels)
+                    }
+                }
+            }
+        }
     }
 
     private var visibleQueue: [QueueEntry] {
@@ -445,9 +529,49 @@ private struct QueuePanel: View {
             }
     }
 
-    private func queueLabel(_ track: AudioTrack, symbol: String? = nil) -> some View {
+    private func canMove(_ entry: QueueEntry, delta: Int) -> Bool {
+        guard let index = visibleQueue.firstIndex(of: entry) else { return false }
+        return visibleQueue.indices.contains(index + delta)
+    }
+
+    private func move(_ entry: QueueEntry, delta: Int) {
+        guard canMove(entry, delta: delta), let index = playback.queue.firstIndex(of: entry) else { return }
+        playback.move(from: IndexSet(integer: index), to: index + (delta > 0 ? 2 : -1))
+    }
+}
+
+private struct QueueTrackRow: View {
+    let library: LibraryStore
+    let track: AudioTrack
+    let play: () -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Button(action: play) {
+                QueueTrackLabel(library: library, track: track)
+                    .padding(.horizontal, 4)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .liquidGlassHover(
+                in: RoundedRectangle(cornerRadius: 8),
+                outset: CGSize(width: 0, height: 1),
+                stableTracking: true
+            )
+        }
+    }
+}
+
+private struct QueueTrackLabel: View {
+    static let artworkPixels = 88
+
+    let library: LibraryStore
+    let track: AudioTrack
+    var symbol: String?
+
+    var body: some View {
         HStack(spacing: 10) {
-            PlayingCover(library: library, track: track, maxPixels: 88)
+            BrowseArtwork(library: library, track: track, pixelSize: Self.artworkPixels, cornerRadius: 4)
                 .frame(width: 34, height: 34)
             VStack(alignment: .leading, spacing: 3) {
                 Text(track.title).font(.subheadline.weight(.medium)).lineLimit(1)
@@ -459,16 +583,6 @@ private struct QueuePanel: View {
         }
         .contentShape(Rectangle())
         .padding(.vertical, 3)
-    }
-
-    private func canMove(_ entry: QueueEntry, delta: Int) -> Bool {
-        guard let index = visibleQueue.firstIndex(of: entry) else { return false }
-        return visibleQueue.indices.contains(index + delta)
-    }
-
-    private func move(_ entry: QueueEntry, delta: Int) {
-        guard canMove(entry, delta: delta), let index = playback.queue.firstIndex(of: entry) else { return }
-        playback.move(from: IndexSet(integer: index), to: index + (delta > 0 ? 2 : -1))
     }
 }
 
@@ -488,7 +602,6 @@ final class PlayerWindowToolbar {
     }
 
     private weak var window: NSWindow?
-    private var wasTransparent: Bool?
     private var toolbarState: ToolbarState?
 
     func hide(in window: NSWindow?) -> CGFloat? {
@@ -499,10 +612,6 @@ final class PlayerWindowToolbar {
         if self.window !== window {
             restore()
             self.window = window
-        }
-        if window.styleMask.contains(.fullSizeContentView) {
-            if wasTransparent == nil { wasTransparent = window.titlebarAppearsTransparent }
-            if !window.titlebarAppearsTransparent { window.titlebarAppearsTransparent = true }
         }
 
         let toolbar = window.toolbar
@@ -524,10 +633,6 @@ final class PlayerWindowToolbar {
 
     func restore() {
         restoreToolbar()
-        if let window, let wasTransparent, window.titlebarAppearsTransparent != wasTransparent {
-            window.titlebarAppearsTransparent = wasTransparent
-        }
-        wasTransparent = nil
         window = nil
     }
 

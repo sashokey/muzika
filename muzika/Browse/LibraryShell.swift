@@ -59,6 +59,7 @@ private struct LibrarySidebar: View {
         .scrollContentBackground(.hidden)
         .scrollEdgeEffectHidden(true, for: .top)
         .frame(width: BrowseLayout.sidebarWidth)
+        .hideTitlebarScrollEdge(enabled: state.route != .songs)
         .background {
             LibrarySidebarBackground()
                 .ignoresSafeArea(.container, edges: .top)

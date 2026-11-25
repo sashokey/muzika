@@ -66,6 +66,9 @@ final class NativeSeekSlider: NSSlider {
     private var display: CADisplayLink?
     private var tracking = false
     private var changedWhileTracking = false
+    #if MUZIKA_DEV_LOGS
+    private var frames = MuzikaFrameMetrics()
+    #endif
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -97,6 +100,9 @@ final class NativeSeekSlider: NSSlider {
     }
 
     func stop() {
+        #if MUZIKA_DEV_LOGS
+        if display != nil { MuzikaTrace.event(.controls, "seek.clock.stop", frames.summary) }
+        #endif
         display?.invalidate()
         display = nil
         clock.reset()
@@ -105,9 +111,15 @@ final class NativeSeekSlider: NSSlider {
     override func mouseDown(with event: NSEvent) {
         tracking = true
         changedWhileTracking = false
+        #if MUZIKA_DEV_LOGS
+        MuzikaTrace.event(.controls, "seek.drag.begin", "position_s=\(doubleValue) duration_s=\(maxValue)")
+        #endif
         stop()
         super.mouseDown(with: event)
         tracking = false
+        #if MUZIKA_DEV_LOGS
+        MuzikaTrace.event(.controls, "seek.drag.end", "position_s=\(doubleValue) changed=\(changedWhileTracking)")
+        #endif
         if changedWhileTracking { configuration?.seek(doubleValue) }
         synchronizeDisplay()
     }
@@ -141,13 +153,27 @@ final class NativeSeekSlider: NSSlider {
         let shouldRun = window != nil && !tracking && configuration?.playing == true &&
             configuration?.isVisible == true && configuration?.reduceMotion == false
         if shouldRun, display == nil {
+            #if MUZIKA_DEV_LOGS
+            frames = MuzikaFrameMetrics()
+            MuzikaTrace.event(.controls, "seek.clock.start", "duration_s=\(maxValue) width_pt=\(bounds.width)")
+            let link = displayLink(target: self, selector: #selector(traceFrame))
+            #else
             let link = displayLink(target: self, selector: #selector(redrawPosition))
+            #endif
             display = link
             link.add(to: .main, forMode: .common)
         } else if !shouldRun {
             stop()
         }
     }
+
+    #if MUZIKA_DEV_LOGS
+    @objc private func traceFrame() {
+        redrawPosition()
+        frames.record(at: CACurrentMediaTime(), position: doubleValue)
+        frames.reportIfReady(.controls, "seek.frames")
+    }
+    #endif
 
     @objc private func redrawPosition() {
         guard !tracking, let configuration else { return }

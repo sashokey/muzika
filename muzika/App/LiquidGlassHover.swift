@@ -265,7 +265,14 @@ private struct GlassHoverButtonSurface: ViewModifier {
             .contentShape(outline)
             .opacity(isEnabled ? 1 : 0.5)
         if hoverAppearance != .glass {
-            button.stableHover { hovered = $0 }
+            button.stableHover { inside in
+                #if MUZIKA_DEV_LOGS
+                if hoverAppearance == .color, hovered != inside {
+                    MuzikaTrace.event(.controls, "play.hover", "inside=\(inside) enabled=\(isEnabled) animated=\(!reduceMotion)")
+                }
+                #endif
+                hovered = inside
+            }
         } else {
             button.onHover { hovered = $0 }
         }

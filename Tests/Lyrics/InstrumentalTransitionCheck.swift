@@ -48,7 +48,9 @@ private final class InstrumentalTransitionCheck: NSObject, NSApplicationDelegate
         if CommandLine.arguments.contains("--visible") {
             guard let screen = NSScreen.screens.first(where: {
                 ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value != CGMainDisplayID()
-            }) else { throw Failure(description: "Secondary display unavailable") }
+            }) ?? NSScreen.main else { throw Failure(description: "No display available") }
+            window.level = .floating
+            window.collectionBehavior.insert(.canJoinAllSpaces)
             let area = screen.visibleFrame
             window.hidesOnDeactivate = false
             window.setFrameOrigin(CGPoint(x: area.maxX - rect.width, y: area.minY))

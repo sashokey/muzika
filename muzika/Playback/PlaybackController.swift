@@ -45,6 +45,9 @@ final class PlaybackController {
     private(set) var position = 0.0
     private(set) var playing = false
     private(set) var playbackError: String?
+    #if MUZIKA_DEV_LOGS
+    private(set) var diagnosticQueueRevision: UInt64 = 0
+    #endif
 
     @ObservationIgnored var onTrackStarted: ((AudioTrack) -> Void)?
     @ObservationIgnored var onListen: ((AudioTrack, Double) -> Void)?
@@ -150,6 +153,9 @@ final class PlaybackController {
         get { lockEnabled }
         set {
             lockEnabled = newValue
+            #if MUZIKA_DEV_LOGS
+            MuzikaTrace.event(.queue, "queue.lock", "locked=\(newValue) count=\(queue.count)")
+            #endif
             saveSettings()
         }
     }
@@ -255,6 +261,9 @@ final class PlaybackController {
         transport?.poll()
         guard let index = currentIndex else { return }
         let target = boundedPosition(newPosition)
+        #if MUZIKA_DEV_LOGS
+        MuzikaTrace.event(.controls, "seek.commit", "position_s=\(position) target_s=\(target) playing=\(playing)")
+        #endif
         load(queue[index], at: target, start: playing, newOccurrence: false)
     }
 
@@ -267,6 +276,9 @@ final class PlaybackController {
         position = 0
         queue = []
         originalOrder = []
+        #if MUZIKA_DEV_LOGS
+        traceQueueMutation("queue.dismiss")
+        #endif
         didDismiss = true
         playbackError = nil
         notifyNowPlaying()
@@ -277,6 +289,9 @@ final class PlaybackController {
         guard !additions.isEmpty else { return }
         let target = next ? (currentIndex.map { $0 + 1 } ?? 0) : queue.endIndex
         queue.insert(contentsOf: additions, at: target)
+        #if MUZIKA_DEV_LOGS
+        traceQueueMutation("queue.insert", "inserted=\(additions.count) target=\(target) next=\(next)")
+        #endif
         let logicalTarget = next
             ? currentEntryID.flatMap { originalOrder.firstIndex(of: $0) }.map { $0 + 1 } ?? 0
             : originalOrder.endIndex
@@ -290,6 +305,9 @@ final class PlaybackController {
 
     func select(_ entry: QueueEntry) {
         guard let matching = queue.first(where: { $0.id == entry.id }) else { return }
+        #if MUZIKA_DEV_LOGS
+        MuzikaTrace.event(.queue, "queue.select", "index=\(queue.firstIndex(of: matching) ?? -1) count=\(queue.count)")
+        #endif
         load(matching, at: 0, start: true)
     }
 
@@ -303,6 +321,9 @@ final class PlaybackController {
         }
         queue.remove(at: index)
         originalOrder.removeAll { $0 == entry.id }
+        #if MUZIKA_DEV_LOGS
+        traceQueueMutation("queue.remove", "index=\(index) removed_current=\(removesCurrent)")
+        #endif
         if !removesCurrent {
             queueChanged()
         } else if !queue.isEmpty {
@@ -320,6 +341,9 @@ final class PlaybackController {
         for index in indexes.reversed() { queue.remove(at: index) }
         queue.insert(contentsOf: entries, at: target)
         originalOrder = queue.map(\.id)
+        #if MUZIKA_DEV_LOGS
+        traceQueueMutation("queue.move", "moved=\(indexes.count) first=\(indexes.first ?? -1) destination=\(destination) target=\(target)")
+        #endif
         queueChanged()
     }
 
@@ -336,6 +360,9 @@ final class PlaybackController {
         let following = session.entries.dropFirst(savedIndex + 1).lazy.compactMap { byID[$0.id] }.first
         guard let entry = byID[session.current] ?? following ?? entries.first else { return }
         queue = entries
+        #if MUZIKA_DEV_LOGS
+        traceQueueMutation("queue.restore")
+        #endif
         originalOrder = session.originalOrder.filter { byID[$0] != nil }
         let restoresSameItem = entry.id == session.current
         load(
@@ -362,6 +389,9 @@ final class PlaybackController {
         let index = currentIndex ?? 0
         let resumed = playing
         queue = available
+        #if MUZIKA_DEV_LOGS
+        traceQueueMutation("queue.reconciled")
+        #endif
         originalOrder.removeAll { byID[$0] == nil }
 
         if let id = currentEntryID, let retained = byID[id] {
@@ -428,6 +458,9 @@ final class PlaybackController {
         } else {
             queue = shuffle ? entries.shuffled() : entries
         }
+        #if MUZIKA_DEV_LOGS
+        traceQueueMutation("queue.replace", "shuffled=\(shuffle)")
+        #endif
         if let entry = start ?? queue.first { load(entry, at: 0, start: true) }
     }
 
@@ -451,7 +484,17 @@ final class PlaybackController {
                 (ranks[$0.id] ?? Int.max) < (ranks[$1.id] ?? Int.max)
             }
         }
+        #if MUZIKA_DEV_LOGS
+        traceQueueMutation("queue.order.changed", "shuffled=\(shuffleEnabled) upcoming=\(upcoming.count)")
+        #endif
     }
+
+    #if MUZIKA_DEV_LOGS
+    private func traceQueueMutation(_ event: StaticString, _ fields: String = "") {
+        diagnosticQueueRevision &+= 1
+        MuzikaTrace.event(.queue, event, "revision=\(diagnosticQueueRevision) count=\(queue.count) \(fields)")
+    }
+    #endif
 
     private func queueChanged() {
         transport?.refreshSuccessor()

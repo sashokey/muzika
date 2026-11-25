@@ -1,6 +1,6 @@
 {
-  "version": "v10",
+  "version": "v11",
   "draft": false,
   "prerelease": false,
-  "notes": "- Add quick playback from song artwork, animate library highlights, and keep track and album rows stable while hovering or selecting.\n- Switch between Filters and Sort with one click and unify Settings controls, search fields, and button highlights.\n- Smooth the Now Playing seek bar, add a PCM spectrum visualizer, and make artist and album names clickable.\n- Fill timed lyric lines progressively. Scroll untimed lyrics to the end of the track and resume following after manual scrolling.\n- Add a Now Playing screenshot to the README.\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
+  "notes": "- Add animated Shuffle on Home to start playback from the entire local library. Reduce rendering work while scrolling.\n- Use native window dragging between displays and keep one continuous glass header above scrolling library content.\n- Improve Up Next opening, row interactions, and artwork loading in long queues.\n- Open Audio info from the visualizer or format and provide a Get Info shortcut.\n- Add diagnostics to DebugLogs and regression tests for visible Home scrolling and lyric transitions.\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
 }

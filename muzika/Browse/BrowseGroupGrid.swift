@@ -484,6 +484,9 @@ private struct GroupGridSurface: NSViewRepresentable {
                 buttonHovered = nil
             }
             guard interactionIndex != index || interactionButtonHovered != buttonHovered else { return }
+            #if MUZIKA_DEV_LOGS
+            MuzikaTrace.event(.library, "group.hover", "row=\(index) list=\(configuration.presentation == .list) play_hover=\(buttonHovered == true) width_pt=\(frame.width) height_pt=\(frame.height)")
+            #endif
             let root = card(configuration, index: index, width: frame.width, nativeCardHeight: frame.height,
                             nativeButtonHovered: buttonHovered)
             if interactionIndex != index {
@@ -530,6 +533,9 @@ private struct GroupGridSurface: NSViewRepresentable {
 
         private func clearInteraction() {
             guard interactionIndex != nil else { return }
+            #if MUZIKA_DEV_LOGS
+            MuzikaTrace.event(.library, "group.hover.exit", "row=\(interactionIndex ?? -1) reduce_motion=\(configuration?.appearance.reduceMotion == true)")
+            #endif
             fadeRemoval?.cancel()
             let spare = fadingBackdrop
             spare?.removeFromSuperview()

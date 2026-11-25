@@ -44,6 +44,20 @@ struct MainWindow: View {
                     .zIndex(1)
             }
         }
+        #if MUZIKA_DEV_LOGS
+        .background {
+            AnimationTraceProbe(
+                area: .player,
+                state: "visible=\(state.showingPlayer) panel=\(MuzikaTrace.panelName(state.panel)) route=\(MuzikaTrace.routeName(state.route)) reduce_motion=\(reduceMotion) hero=\(state.preferences.heroAnimations)",
+                observesWindow: true
+            )
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+        .onChange(of: state.settingsPage) { _, page in
+            MuzikaTrace.event(.library, "settings.page", "page=\(page?.rawValue ?? "closed")")
+        }
+        #endif
         .toolbar(removing: .title)
         .animation(playerAnimation, value: state.showingPlayer)
         .dynamicTypeSize(state.preferences.largerInterface ? max(typeSize, .xxLarge) : typeSize)

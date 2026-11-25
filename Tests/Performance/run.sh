@@ -2,9 +2,15 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
-report="${1:?Usage: bash Tests/Performance/run.sh ABSOLUTE_REPORT.json [repeats] [ABSOLUTE_TRACE.trace]}"
+report="${1:?Usage: bash Tests/Performance/run.sh ABSOLUTE_REPORT.json [repeats] [ABSOLUTE_TRACE.trace] [suite|home]}"
 repeats="${2:-3}"
 trace="${3:-}"
+mode="${4:-suite}"
+case "$mode" in suite|home) ;; *) printf '%s\n' "Unknown performance mode: $mode" >&2; exit 2 ;; esac
+if [[ "$mode" == home && -z "$trace" ]]; then
+    printf '%s\n' "Home scroll verification requires an Instruments trace." >&2
+    exit 2
+fi
 case "$report" in /*) ;; *) printf '%s\n' "The report path must be absolute." >&2; exit 2 ;; esac
 scratch="$(mktemp -d /tmp/muzika-performance.XXXXXXXX)"
 python3 - "$root/muzika" "$scratch" <<'PY'
@@ -31,12 +37,14 @@ for file in source.rglob("*.swift"):
         text = replace(text, "    @ObservationIgnored private let system: SystemPlayback\n", "")
         text = replace(text, "        system = SystemPlayback(library: library, playback: playback)\n", "")
         text = replace(text, "        playback.onNowPlayingChange = { [weak system] in system?.update() }\n", "")
-    elif file.name in ["HistoryStore.swift", "Preferences.swift", "SearchAndListening.swift", "TrackBrowser.swift", "FolderBrowserPage.swift"]:
+    elif file.name in ["HistoryStore.swift", "Preferences.swift", "PreferencesView.swift", "SearchAndListening.swift", "TrackBrowser.swift", "FolderBrowserPage.swift"]:
         text = text.replace("UserDefaults.standard", "BenchmarkDefaults()")
         text = re.sub(r'@AppStorage\(("[^"\n]+")\)', r'@AppStorage(\1, store: BenchmarkDefaults())', text)
     elif file.name == "WaveBackground.swift":
         before = "        buffer.addCompletedHandler { [weak self] completed in\n"
         text = replace(text, before, before + "            PerformanceGPU.record(completed)\n")
+        present = "        frame.drawable.present()\n"
+        text = replace(text, present, "        PerformanceGPU.observe(frame.drawable)\n" + present)
     target = sandbox / file.relative_to(source)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(text)
@@ -46,11 +54,11 @@ files=()
 while IFS= read -r -d "" file; do files+=("$file"); done < <(find "$scratch" -type f -name '*.swift' -print0)
 xcrun swiftc -O -parse-as-library -swift-version 6 -target arm64-apple-macosx27.0 \
     -Xfrontend -disable-sandbox -module-cache-path "${MUZIKA_PERFORMANCE_MODULE_CACHE:-$scratch/module-cache}" \
-    "$root/Tests/Performance/PerformanceProbe.swift" "${files[@]}" -o "$scratch/MuzikaPerformance"
+    "$root/Tests/Performance/PerformanceProbe.swift" "$root/Tests/Performance/HomeScrollCheck.swift" "${files[@]}" -o "$scratch/MuzikaPerformance"
 printf 'Fixture: %s\n' "$scratch"
 if [[ "${MUZIKA_PERFORMANCE_BUILD_ONLY:-0}" == 1 ]]; then exit 0; fi
 if [[ -n "$trace" ]]; then
-    bash "$root/Tests/Performance/record-trace.sh" "$scratch" "$report" "$repeats" "$trace"
+    bash "$root/Tests/Performance/record-trace.sh" "$scratch" "$report" "$repeats" "$trace" "$mode"
 else
     "$scratch/MuzikaPerformance" "$scratch" "$report" "$repeats"
 fi

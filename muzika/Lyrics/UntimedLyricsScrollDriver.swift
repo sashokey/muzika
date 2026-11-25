@@ -34,6 +34,10 @@ struct UntimedLyricsScrollDriver: NSViewRepresentable {
         private var liveScrolling = false
         private var isHolding = false
         private var returnMotion: ReturnMotion?
+        #if MUZIKA_DEV_LOGS
+        private var frames = MuzikaFrameMetrics()
+        private var reportedBottom = false
+        #endif
 
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
@@ -56,6 +60,9 @@ struct UntimedLyricsScrollDriver: NSViewRepresentable {
         }
 
         func stop() {
+            #if MUZIKA_DEV_LOGS
+            if link != nil { MuzikaTrace.event(.lyrics, "untimed.clock.detached", frames.summary) }
+            #endif
             resume?.cancel()
             resume = nil
             link?.invalidate()
@@ -73,6 +80,9 @@ struct UntimedLyricsScrollDriver: NSViewRepresentable {
             stop()
             guard let next else { return }
             scroll = next
+            #if MUZIKA_DEV_LOGS
+            MuzikaTrace.event(.lyrics, "untimed.attach")
+            #endif
             let center = NotificationCenter.default
             center.addObserver(self, selector: #selector(startedScrolling), name: NSScrollView.willStartLiveScrollNotification, object: next)
             center.addObserver(self, selector: #selector(didScroll), name: NSScrollView.didLiveScrollNotification, object: next)
@@ -80,6 +90,9 @@ struct UntimedLyricsScrollDriver: NSViewRepresentable {
         }
 
         @objc private func startedScrolling() {
+            #if MUZIKA_DEV_LOGS
+            MuzikaTrace.event(.lyrics, "untimed.manual.begin")
+            #endif
             liveScrolling = true
             holdPosition()
         }
@@ -90,6 +103,9 @@ struct UntimedLyricsScrollDriver: NSViewRepresentable {
         }
 
         @objc private func endedScrolling() {
+            #if MUZIKA_DEV_LOGS
+            MuzikaTrace.event(.lyrics, "untimed.manual.end", "resume_delay_s=\(LyricsScrollTiming.manualHold)")
+            #endif
             liveScrolling = false
             scheduleResume()
         }
@@ -109,6 +125,9 @@ struct UntimedLyricsScrollDriver: NSViewRepresentable {
                 catch { return }
                 guard let self else { return }
                 isHolding = false
+                #if MUZIKA_DEV_LOGS
+                MuzikaTrace.event(.lyrics, "untimed.manual.resume", "animated=\(configuration?.reduceMotion == false)")
+                #endif
                 if let scroll, configuration?.reduceMotion == false {
                     returnMotion = ReturnMotion(origin: scroll.contentView.bounds.minY, started: CACurrentMediaTime())
                 }
@@ -126,14 +145,31 @@ struct UntimedLyricsScrollDriver: NSViewRepresentable {
             let shouldRun = scroll != nil && hasDuration && configuration?.visible == true && !isHolding &&
                 ((configuration?.playing == true && configuration?.reduceMotion == false) || returnMotion != nil)
             if shouldRun, link == nil {
+                #if MUZIKA_DEV_LOGS
+                frames = MuzikaFrameMetrics()
+                MuzikaTrace.event(.lyrics, "untimed.clock.start")
+                let display = displayLink(target: self, selector: #selector(traceFrame))
+                #else
                 let display = displayLink(target: self, selector: #selector(reflectPlayback))
+                #endif
                 link = display
                 display.add(to: .main, forMode: .common)
             } else if !shouldRun, let link {
+                #if MUZIKA_DEV_LOGS
+                MuzikaTrace.event(.lyrics, "untimed.clock.stop", "\(frames.summary)")
+                #endif
                 link.invalidate()
                 self.link = nil
             }
         }
+
+        #if MUZIKA_DEV_LOGS
+        @objc private func traceFrame() {
+            reflectPlayback()
+            frames.record(at: CACurrentMediaTime(), position: scroll.map { Double($0.contentView.bounds.minY) })
+            frames.reportIfReady(.lyrics, "untimed.frames")
+        }
+        #endif
 
         @objc private func reflectPlayback() {
             defer { synchronizeClock() }
@@ -150,6 +186,12 @@ struct UntimedLyricsScrollDriver: NSViewRepresentable {
             let time = configuration.playing ? configuration.position() : configuration.positionSnapshot
             guard time.isFinite else { return }
             let fraction = min(1, max(0, time / duration))
+            #if MUZIKA_DEV_LOGS
+            if fraction == 1, !reportedBottom {
+                MuzikaTrace.event(.lyrics, "untimed.bottom", "duration_s=\(duration) scrollable_pt=\(extent)")
+            }
+            reportedBottom = fraction == 1
+            #endif
             let target = range.minY + extent * (clip.isFlipped ? fraction : 1 - fraction)
             var y = target
             if let returnMotion {

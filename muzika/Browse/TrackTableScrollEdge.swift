@@ -6,7 +6,17 @@ extension View {
     func trackTableScrollEdge(enabled: Bool = true, usesUniformRows: Bool = false) -> some View {
         background {
             if enabled {
-                TrackTableScrollEdge(usesUniformRows: usesUniformRows)
+                BrowseNativeScrollEdge(usesUniformRows: usesUniformRows)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+
+    func hideTitlebarScrollEdge(enabled: Bool = true) -> some View {
+        background {
+            if enabled {
+                BrowseNativeScrollEdge(hidesTitlebarBackdrop: true)
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }
@@ -14,8 +24,9 @@ extension View {
     }
 }
 
-private struct TrackTableScrollEdge: NSViewRepresentable {
+private struct BrowseNativeScrollEdge: NSViewRepresentable {
     var usesUniformRows = false
+    var hidesTitlebarBackdrop = false
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -24,6 +35,7 @@ private struct TrackTableScrollEdge: NSViewRepresentable {
     func makeNSView(context: Context) -> Anchor { Anchor() }
 
     func updateNSView(_ view: Anchor, context: Context) {
+        view.hidesTitlebarBackdrop = hidesTitlebarBackdrop
         view.enabled = !reduceTransparency
         view.useUniformRows = usesUniformRows && dynamicTypeSize == .large && controlSize == .regular
         view.updateMasks()
@@ -36,12 +48,16 @@ private struct TrackTableScrollEdge: NSViewRepresentable {
     final class Anchor: NSView {
         var enabled = true
         var useUniformRows = false
+        var hidesTitlebarBackdrop = false
         private weak var scroll: NSScrollView?
-        private var masks: [ObjectIdentifier: EdgeMask] = [:]
+        private var masks: [ObjectIdentifier: RectangularLayerMask] = [:]
         private weak var sizedTable: NSTableView?
         private var originalRowHeight: CGFloat?
         private var uniformRowHeight: CGFloat?
         private var rowSizingPending = false
+        #if MUZIKA_DEV_LOGS
+        private weak var tracedTable: NSTableView?
+        #endif
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
@@ -69,11 +85,19 @@ private struct TrackTableScrollEdge: NSViewRepresentable {
                 let region = convert(bounds, to: nil)
                 var ancestor = superview
                 while let view = ancestor, scroll == nil {
-                    scroll = findTableScroll(in: view, region: region)
+                    scroll = findScroll(in: view, region: region)
                     ancestor = view.superview
                 }
             }
-            guard let scroll, let table = scroll.documentView as? NSTableView else { return }
+            guard let scroll else { return }
+            if hidesTitlebarBackdrop {
+                updateMasks(in: scroll, retaining: nil, titlebarBottom: window.contentLayoutRect.maxY)
+                return
+            }
+            guard let table = scroll.documentView as? NSTableView else { return }
+            #if MUZIKA_DEV_LOGS
+            observeSelection(in: table)
+            #endif
             updateRowSizing(for: table)
             guard enabled, let header = table.headerView, header.window === window else {
                 for mask in masks.values { mask.restore() }
@@ -87,17 +111,25 @@ private struct TrackTableScrollEdge: NSViewRepresentable {
                 restoreMasks()
                 return
             }
+            updateMasks(in: scroll, retaining: band)
+        }
+
+        private func updateMasks(in scroll: NSScrollView, retaining band: CGRect?, titlebarBottom: CGFloat? = nil) {
+            let frame = scroll.convert(scroll.bounds, to: nil)
             var active: Set<ObjectIdentifier> = []
             for view in scroll.subviews {
                 let name = String(describing: type(of: view))
+                let backdropFrame = view.convert(view.bounds, to: nil)
                 guard name == "BackdropView" || name == "NSScrollPocket",
-                      abs(view.convert(view.bounds, to: nil).maxY - frame.maxY) < 1,
+                      abs(backdropFrame.maxY - frame.maxY) < 1,
+                      !backdropFrame.isEmpty,
                       let layer = view.layer else { continue }
-                let rect = view.convert(band, from: nil).intersection(view.bounds)
-                guard !rect.isEmpty else { continue }
+                if let titlebarBottom, backdropFrame.minY < titlebarBottom - 1 { continue }
+                let rect = band.map { view.convert($0, from: nil).intersection(view.bounds) } ?? .zero
+                guard band == nil || !rect.isEmpty else { continue }
                 let id = ObjectIdentifier(layer)
                 active.insert(id)
-                let mask = masks[id] ?? EdgeMask(layer: layer)
+                let mask = masks[id] ?? RectangularLayerMask(layer: layer)
                 mask.update(rect)
                 masks[id] = mask
             }
@@ -110,7 +142,30 @@ private struct TrackTableScrollEdge: NSViewRepresentable {
             for mask in masks.values { mask.restore() }
             masks.removeAll()
             scroll = nil
+            #if MUZIKA_DEV_LOGS
+            NotificationCenter.default.removeObserver(self, name: NSTableView.selectionDidChangeNotification, object: tracedTable)
+            tracedTable = nil
+            #endif
         }
+
+        #if MUZIKA_DEV_LOGS
+        private func observeSelection(in table: NSTableView) {
+            guard tracedTable !== table else { return }
+            let center = NotificationCenter.default
+            center.removeObserver(self, name: NSTableView.selectionDidChangeNotification, object: tracedTable)
+            tracedTable = table
+            center.addObserver(self, selector: #selector(selectionChanged(_:)),
+                name: NSTableView.selectionDidChangeNotification, object: table)
+        }
+
+        @objc private func selectionChanged(_ notification: Notification) {
+            guard let table = notification.object as? NSTableView else { return }
+            let row = table.selectedRow >= 0 ? table.selectedRow : 0
+            let height = table.numberOfRows > row ? table.rect(ofRow: row).height : 0
+            MuzikaTrace.event(.library, "table.selection",
+                "selected=\(table.numberOfSelectedRows) row=\(row) measured_pt=\(height) native_height_pt=\(table.rowHeight) automatic=\(table.usesAutomaticRowHeights)")
+        }
+        #endif
 
         private func updateRowSizing(for table: NSTableView) {
             if sizedTable !== table { forgetRowSizing() }
@@ -152,6 +207,12 @@ private struct TrackTableScrollEdge: NSViewRepresentable {
                 uniformRowHeight = height
                 sizedTable = table
             }
+            #if MUZIKA_DEV_LOGS
+            if table.rowHeight != height || table.usesAutomaticRowHeights {
+                MuzikaTrace.event(.library, "table.uniform-height",
+                    "before_pt=\(table.rowHeight) fixed_pt=\(height) spacing_pt=\(table.intercellSpacing.height) rows=\(table.numberOfRows)")
+            }
+            #endif
             if table.rowHeight != height { table.rowHeight = height }
             if table.usesAutomaticRowHeights { table.usesAutomaticRowHeights = false }
         }
@@ -170,8 +231,8 @@ private struct TrackTableScrollEdge: NSViewRepresentable {
             uniformRowHeight = nil
         }
 
-        private func findTableScroll(in view: NSView, region: CGRect) -> NSScrollView? {
-            if let scroll = view as? NSScrollView, scroll.documentView is NSTableView {
+        private func findScroll(in view: NSView, region: CGRect) -> NSScrollView? {
+            if let scroll = view as? NSScrollView, hidesTitlebarBackdrop || scroll.documentView is NSTableView {
                 let frame = scroll.convert(scroll.bounds, to: nil)
                 if abs(frame.minX - region.minX) < 1, abs(frame.width - region.width) < 1,
                    frame.minY - 1 <= region.minY, frame.maxY + 1 >= region.maxY {
@@ -179,42 +240,9 @@ private struct TrackTableScrollEdge: NSViewRepresentable {
                 }
             }
             for child in view.subviews.reversed() {
-                if let scroll = findTableScroll(in: child, region: region) { return scroll }
+                if let scroll = findScroll(in: child, region: region) { return scroll }
             }
             return nil
-        }
-    }
-
-    @MainActor
-    private final class EdgeMask {
-        private weak var layer: CALayer?
-        private var original: CALayer?
-        private let mask = CAShapeLayer()
-        private var rect: CGRect = .null
-
-        init(layer: CALayer) {
-            self.layer = layer
-            mask.fillColor = NSColor.black.cgColor
-        }
-
-        func update(_ rect: CGRect) {
-            guard let layer else { return }
-            guard self.rect != rect || mask.frame != layer.bounds || layer.mask !== mask else { return }
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            self.rect = rect
-            mask.frame = layer.bounds
-            mask.path = CGPath(rect: rect, transform: nil)
-            if layer.mask !== mask {
-                original = layer.mask
-                layer.mask = mask
-            }
-            CATransaction.commit()
-        }
-
-        func restore() {
-            guard let layer, layer.mask === mask else { return }
-            layer.mask = original
         }
     }
 }

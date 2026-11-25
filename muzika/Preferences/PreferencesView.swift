@@ -351,7 +351,13 @@ private struct SettingsSliderRow: View {
     private func setValue(_ candidate: Double) {
         let intervals = ((candidate - range.lowerBound) / step).rounded()
         let nearest = range.lowerBound + intervals * step
-        value = min(range.upperBound, max(range.lowerBound, nearest))
+        let clamped = min(range.upperBound, max(range.lowerBound, nearest))
+        #if MUZIKA_DEV_LOGS
+        if value != clamped {
+            MuzikaTrace.event(.library, "settings.slider", "from=\(value) to=\(clamped) lower=\(range.lowerBound) upper=\(range.upperBound) step=\(step)")
+        }
+        #endif
+        value = clamped
     }
 }
 

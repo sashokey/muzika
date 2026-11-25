@@ -223,7 +223,14 @@ private struct ArtworkPlaybackControl: View {
         .allowsHitTesting(showsControl)
         .accessibilityHidden(!showsControl)
         if hoverOverride == nil {
-            button.stableHover { buttonHovered = $0 }
+            button.stableHover { inside in
+                #if MUZIKA_DEV_LOGS
+                if buttonHovered != inside {
+                    MuzikaTrace.event(.library, "artwork.play.hover", "inside=\(inside) layout=\(layout) target_width_pt=\(layout.hitWidth)")
+                }
+                #endif
+                buttonHovered = inside
+            }
         } else {
             button
         }

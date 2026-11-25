@@ -113,10 +113,28 @@ struct ArtworkSpectrumBadge: View {
         }
         let client = UUID()
         playback.setSpectrumEnabled(true, from: client)
+        #if MUZIKA_DEV_LOGS
+        var lastSpectrumReport = -Double.infinity
+        if style == .audioInfo {
+            MuzikaTrace.event(.controls, "spectrum.start",
+                "bands=\(restingLevels.count) width_pt=\(width ?? diameter) peak_height_pt=\(diameter + 2 * verticalOutset)")
+        }
+        defer {
+            if style == .audioInfo { MuzikaTrace.event(.controls, "spectrum.stop") }
+        }
+        #endif
         defer { playback.setSpectrumEnabled(false, from: client) }
         while !Task.isCancelled {
             let spectrum = playback.spectrum()
             let next = spectrum.isEmpty ? restingLevels : Self.bands(from: spectrum, count: restingLevels.count)
+            #if MUZIKA_DEV_LOGS
+            let now = ProcessInfo.processInfo.systemUptime
+            if style == .audioInfo, now - lastSpectrumReport >= 1 {
+                lastSpectrumReport = now
+                MuzikaTrace.event(.controls, "spectrum.levels",
+                    "available=\(!spectrum.isEmpty) bass=\(next.first ?? 0) peak=\(next.max() ?? 0) treble=\(next.last ?? 0)")
+            }
+            #endif
             if levels != next {
                 withAnimation(.easeInOut(duration: 0.14)) { levels = next }
             }

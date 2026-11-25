@@ -15,6 +15,23 @@ struct GPUSlice: Sendable {
 
 enum PerformanceGPU {
     private static let slices = Mutex<[GPUSlice]>([])
+    private static let presentations = Mutex<[Double]>([])
+
+    static func observe(_ drawable: any MTLDrawable) {
+        drawable.addPresentedHandler { drawable in
+            if drawable.presentedTime > 0 {
+                presentations.withLock { $0.append(drawable.presentedTime) }
+            }
+        }
+    }
+
+    static func presentedFrames(from lower: Double, to upper: Double) -> [Double] {
+        presentations.withLock { times in
+            let measured = times.filter { $0 >= lower && $0 <= upper }.sorted()
+            times.removeAll { $0 <= upper }
+            return measured
+        }
+    }
 
     static func record(_ buffer: any MTLCommandBuffer) {
         let start = buffer.gpuStartTime
@@ -50,6 +67,11 @@ enum BenchmarkPaths {
     static var history: URL { scratch.appending(path: "history.json") }
 }
 
+private final class PerformanceWindow: NSWindow {
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
+}
+
 private struct BenchmarkSample: Codable {
     let action: String
     let iteration: Int
@@ -60,10 +82,19 @@ private struct BenchmarkSample: Codable {
     let ramBeforeMiB: Double
     let ramAfterMiB: Double
     let sampledPeakRAMMiB: Double
+    let windowVisible: Bool
+    let displayMaximumHz: Int
+    let lowPowerMode: Bool
+    let macOS: String
+    let playbackMode: String
+    let metalPresentedFrames: Int
+    let metalFrameIntervalP95Milliseconds: Double?
 
     enum CodingKeys: String, CodingKey {
         case action, iteration, actionWallMilliseconds, sampledWallMilliseconds
         case cpuMilliseconds, appMetalMilliseconds, ramBeforeMiB, ramAfterMiB, sampledPeakRAMMiB
+        case windowVisible, displayMaximumHz, lowPowerMode, macOS, playbackMode
+        case metalPresentedFrames, metalFrameIntervalP95Milliseconds
     }
 
     func encode(to encoder: Encoder) throws {
@@ -77,6 +108,13 @@ private struct BenchmarkSample: Codable {
         try data.encode(ramBeforeMiB, forKey: .ramBeforeMiB)
         try data.encode(ramAfterMiB, forKey: .ramAfterMiB)
         try data.encode(sampledPeakRAMMiB, forKey: .sampledPeakRAMMiB)
+        try data.encode(windowVisible, forKey: .windowVisible)
+        try data.encode(displayMaximumHz, forKey: .displayMaximumHz)
+        try data.encode(lowPowerMode, forKey: .lowPowerMode)
+        try data.encode(macOS, forKey: .macOS)
+        try data.encode(playbackMode, forKey: .playbackMode)
+        try data.encode(metalPresentedFrames, forKey: .metalPresentedFrames)
+        try data.encode(metalFrameIntervalP95Milliseconds, forKey: .metalFrameIntervalP95Milliseconds)
     }
 }
 
@@ -86,16 +124,38 @@ enum PerformanceProbe {
     private static let signposts = OSSignposter(logHandle: OSLog(subsystem: "org.muzika.performance", category: .pointsOfInterest))
 
     static func main() async throws {
-        _ = NSApplication.shared
-        NSApp.setActivationPolicy(.accessory)
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        guard showsWindow else {
+            try await run()
+            return
+        }
+        Task { @MainActor in
+            do {
+                try await run()
+                exit(0)
+            } catch {
+                FileHandle.standardError.write(Data("\(error)\n".utf8))
+                exit(1)
+            }
+        }
+        app.run()
+    }
+
+    private static func run() async throws {
         let report = URL(filePath: CommandLine.arguments[2])
         let repetitions = max(1, Int(CommandLine.arguments[3]) ?? 3)
-        let actions = try benchmarkActions()
+        let homeOnly = CommandLine.arguments.dropFirst(4).first == "home"
+        let actions: [Action] = homeOnly ? [
+            Action("home.shuffle_scroll_down") { try await HomeScrollCheck.run(host: $0.host, window: $0.window, down: true) },
+            Action("home.shuffle_scroll_up") { try await HomeScrollCheck.run(host: $0.host, window: $0.window, down: false) },
+        ] : try benchmarkActions()
         var results: [BenchmarkSample] = []
         for iteration in 1...repetitions {
             let fixture = try Fixture()
-            try await Task.sleep(for: .milliseconds(150))
+            try await Task.sleep(for: .milliseconds(showsWindow ? 500 : 150))
             fixture.host.layoutSubtreeIfNeeded()
+            try fixture.checkVisibility()
             for action in actions {
                 results.append(try await measure(action, iteration: iteration, fixture: fixture))
             }
@@ -111,6 +171,8 @@ enum PerformanceProbe {
     }
 
     private static func measure(_ action: Action, iteration: Int, fixture: Fixture) async throws -> BenchmarkSample {
+        try fixture.checkVisibility()
+        let playbackMode = fixture.state.playback.playing ? "offline" : "idle"
         let interval = signposts.beginInterval("Action", id: signposts.makeSignpostID(), "\(action.name, privacy: .public)")
         defer { signposts.endInterval("Action", interval) }
 
@@ -124,19 +186,31 @@ enum PerformanceProbe {
         try await action.run(fixture)
         fixture.host.layoutSubtreeIfNeeded()
         let work = milliseconds(started.duration(to: clock.now))
-        for _ in 0..<5 {
-            try await Task.sleep(for: .milliseconds(45))
-            fixture.host.layoutSubtreeIfNeeded()
-            memoryPeak = max(memoryPeak, try footprint())
+        if !action.name.hasPrefix("home.shuffle_scroll_") {
+            for _ in 0..<5 {
+                try await Task.sleep(for: .milliseconds(45))
+                fixture.host.layoutSubtreeIfNeeded()
+                memoryPeak = max(memoryPeak, try footprint())
+            }
         }
+        try fixture.checkVisibility()
         let memoryAfter = try footprint()
         let cpu = Double(clock_gettime_nsec_np(CLOCK_PROCESS_CPUTIME_ID) - cpuStart) / 1_000_000
-        let gpu = PerformanceGPU.milliseconds(from: gpuStart, to: CACurrentMediaTime())
+        let frameEnd = CACurrentMediaTime()
+        let gpu = PerformanceGPU.milliseconds(from: gpuStart, to: frameEnd)
+        let frames = PerformanceGPU.presentedFrames(from: gpuStart, to: frameEnd)
+        let intervals = zip(frames, frames.dropFirst()).map { ($1 - $0) * 1_000 }.sorted()
+        let p95 = intervals.isEmpty ? nil : intervals[Int(ceil(Double(intervals.count) * 0.95)) - 1]
         return BenchmarkSample(
             action: action.name, iteration: iteration, actionWallMilliseconds: work,
             sampledWallMilliseconds: milliseconds(started.duration(to: clock.now)),
             cpuMilliseconds: cpu, appMetalMilliseconds: gpu,
-            ramBeforeMiB: memoryBefore, ramAfterMiB: memoryAfter, sampledPeakRAMMiB: max(memoryPeak, memoryAfter)
+            ramBeforeMiB: memoryBefore, ramAfterMiB: memoryAfter, sampledPeakRAMMiB: max(memoryPeak, memoryAfter),
+            windowVisible: fixture.window.occlusionState.contains(.visible),
+            displayMaximumHz: fixture.window.screen?.maximumFramesPerSecond ?? 0,
+            lowPowerMode: ProcessInfo.processInfo.isLowPowerModeEnabled,
+            macOS: ProcessInfo.processInfo.operatingSystemVersionString,
+            playbackMode: playbackMode, metalPresentedFrames: frames.count, metalFrameIntervalP95Milliseconds: p95
         )
     }
 
@@ -180,6 +254,11 @@ enum PerformanceProbe {
             Action("settings.\(page.rawValue)") { $0.state.settingsPage = page }
         }
         return navigation + settings + [
+            Action("navigate.artist_albums") { fixture in
+                guard let artist = BrowseGroup.artists(fixture.state.library.tracks).max(by: { $0.tracks.count < $1.tracks.count })
+                else { throw CocoaError(.validationMissingMandatoryProperty) }
+                fixture.state.navigate(artist.route)
+            },
             Action("navigation.back") { $0.state.back() },
             Action("navigation.forward") { $0.state.forward() },
             Action("search.query") { fixture in
@@ -221,6 +300,24 @@ enum PerformanceProbe {
             Action("lyrics.visible_active_line") { fixture in
                 try fixture.verifyVisibleLyricInk()
             },
+            Action("lyrics.follow_during_playback") { fixture in
+                let playback = fixture.state.playback
+                let scroll = try fixture.lyricsScrollView()
+                let startTime = playback.livePosition
+                let startY = scroll.contentView.bounds.minY
+                for _ in 0..<75 {
+                    for _ in 0..<6 {
+                        if try !playback.renderOffline() { break }
+                    }
+                    try await Task.sleep(for: .milliseconds(16))
+                    if playback.livePosition >= startTime + 0.75 { break }
+                }
+                try await Task.sleep(for: .milliseconds(250))
+                guard playback.livePosition >= startTime + 0.75,
+                      abs(scroll.contentView.bounds.minY - startY) > 10 else {
+                    throw HomeScrollCheck.Failure("Lyrics did not follow advancing offline playback")
+                }
+            },
             Action("lyrics.manual_scroll") { fixture in
                 let scroll = try fixture.lyricsScrollView()
                 let before = scroll.contentView.bounds.origin
@@ -252,7 +349,7 @@ enum PerformanceProbe {
     private final class Fixture {
         let state: AppState
         let media: [AudioTrack]
-        let host: NSHostingView<MainWindow>
+        let host: NSHostingView<AnyView>
         let window: NSWindow
         let groupIndex = LibraryGroupIndex()
         let importFolder: URL
@@ -298,23 +395,40 @@ enum PerformanceProbe {
             try JSONEncoder().encode(contents).write(to: BenchmarkPaths.library, options: .atomic)
             try Data("[]".utf8).write(to: BenchmarkPaths.history, options: .atomic)
             state = AppState()
-            host = NSHostingView(rootView: MainWindow(state: state))
+            host = NSHostingView(rootView: AnyView(
+                MainWindow(state: state)
+                    .environment(\.scenePhase, PerformanceProbe.showsWindow ? .active : .inactive)
+            ))
             let size = NSSize(width: 1250, height: 860)
-            window = NSWindow(contentRect: CGRect(origin: .zero, size: size),
-                styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: true)
+            window = PerformanceWindow(contentRect: CGRect(origin: .zero, size: size),
+                styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
+                backing: .buffered, defer: true)
             window.contentView = host
             window.setContentSize(size)
             host.frame.size = size
             window.title = "MUZIKA? Performance Fixture"
-            if !PerformanceProbe.showsWindow {
+            window.ignoresMouseEvents = true
+            if PerformanceProbe.showsWindow {
+                window.alphaValue = 1
+                window.level = .floating
+                window.collectionBehavior.insert(.canJoinAllSpaces)
+            } else {
                 window.alphaValue = 0
-                window.ignoresMouseEvents = true
             }
             window.center()
             window.orderFrontRegardless()
         }
 
         isolated deinit { window.orderOut(nil) }
+
+        func checkVisibility() throws {
+            if PerformanceProbe.showsWindow,
+               (!window.occlusionState.contains(.visible) || window.isKeyWindow) {
+                throw HomeScrollCheck.Failure(
+                    "Performance window: ordered=\(window.isVisible), visible=\(window.occlusionState.contains(.visible)), key=\(window.isKeyWindow)"
+                )
+            }
+        }
 
         func consume(_ tracks: [AudioTrack]) { checksum = tracks.first?.id.hashValue ?? tracks.count }
 

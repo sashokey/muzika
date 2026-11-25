@@ -469,6 +469,11 @@ struct ListeningBrowser: View {
         let repeated = history.onRepeat(in: available)
         let resumable = playback.current.flatMap { current in available.first { $0.id == current.id } }
         return VStack(alignment: .leading, spacing: 20) {
+            if !library.tracks.isEmpty {
+                HomeShuffleButton(allowsMotion: playbackArtworkIsVisible) {
+                    playback.play(library.tracks, shuffled: true)
+                }
+            }
             if !recent.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {

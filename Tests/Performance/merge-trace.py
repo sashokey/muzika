@@ -1,6 +1,7 @@
 from collections import Counter, defaultdict
 import json
 from pathlib import Path
+import subprocess
 import sys
 from xml.etree.ElementTree import iterparse
 
@@ -81,12 +82,14 @@ def main():
     for row in samples:
         lower, target = actions[row["action"]][row["iteration"] - 1]
         windows.append((lower, lower + round(row["sampledWallMilliseconds"] * 1_000_000), target))
+    version = subprocess.check_output(["xcodebuild", "-version"], text=True).strip().replace("\n", ", ")
     for index, (lower, upper, target) in enumerate(windows):
         if index + 1 < len(windows):
             next_start = windows[index + 1][0]
             if next_start <= lower or upper > next_start + 2_000_000:
                 raise ValueError("Timestamped action windows are out of order or overlap")
             upper = min(upper, next_start)
+        samples[index]["xcode"] = version
         samples[index]["traceGPUActiveMilliseconds"] = busy_milliseconds(gpu_events.get(target, []), lower, upper)
 
     report.write_text(json.dumps(samples, indent=2) + "\n")

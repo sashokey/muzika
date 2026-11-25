@@ -448,7 +448,8 @@ struct BrowseArtwork: View {
     }
 
     var body: some View {
-        let currentImage = thumbnail?.trackID == track?.id ? thumbnail?.image : nil
+        let localImage = thumbnail?.trackID == track?.id ? thumbnail?.image : nil
+        let currentImage = localImage ?? track.flatMap { Self.cachedThumbnail(for: $0, pixelSize: pixelSize) }
         let key = track.map { "\(pixelSize):\($0.id)" }
         let outline = RoundedRectangle(cornerRadius: circular ? 512 : cornerRadius)
         Color(nsColor: .controlBackgroundColor)
@@ -530,6 +531,7 @@ extension View {
             let topInset = geometry.safeAreaInsets.top
             self.contentMargins(.top, topInset, for: .scrollContent)
                 .contentMargins(.top, topInset, for: .scrollIndicators)
+                .hideTitlebarScrollEdge()
                 .ignoresSafeArea(.container, edges: .top)
         }
     }

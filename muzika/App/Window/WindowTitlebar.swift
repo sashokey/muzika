@@ -43,6 +43,7 @@ private struct WindowTitlebar: NSViewRepresentable {
         private var showsTitle = true
         private var filter: WindowLibraryFilter?
         private var filterLeading: NSLayoutConstraint?
+        private var backdropMask: RectangularLayerMask?
         private let titlebarPadding: NSTitlebarAccessoryViewController = {
             let accessory = NSTitlebarAccessoryViewController()
             accessory.layoutAttribute = .bottom
@@ -135,6 +136,8 @@ private struct WindowTitlebar: NSViewRepresentable {
 
         override func viewWillMove(toWindow newWindow: NSWindow?) {
             if let window, window !== newWindow {
+                backdropMask?.restore()
+                backdropMask = nil
                 NotificationCenter.default.removeObserver(self, name: NSWindow.didResizeNotification, object: window)
                 setAccessory(accessory, visible: false, in: window)
                 setAccessory(filterAccessory, visible: false, in: window)
@@ -146,7 +149,6 @@ private struct WindowTitlebar: NSViewRepresentable {
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             guard let window else { return }
-            window.titlebarAppearsTransparent = true
             window.titlebarSeparatorStyle = .none
             window.titleVisibility = .hidden
             filterAccessory.layoutAttribute = window.windowTitlebarLayoutDirection == .rightToLeft ? .right : .left
@@ -158,11 +160,11 @@ private struct WindowTitlebar: NSViewRepresentable {
 
         override func layout() {
             super.layout()
-            if let window { centerFilter(in: window) }
+            if let window { layoutAccessories(in: window) }
         }
 
         @objc private func windowDidResize(_ notification: Notification) {
-            if let window { centerFilter(in: window) }
+            if let window { layoutAccessories(in: window) }
         }
 
         private func updateAccessories(in window: NSWindow) {
@@ -176,7 +178,36 @@ private struct WindowTitlebar: NSViewRepresentable {
                 if filterField.stringValue != text { filterField.stringValue = text }
             }
             setAccessory(filterAccessory, visible: filter != nil, in: window)
+            layoutAccessories(in: window)
+        }
+
+        private func layoutAccessories(in window: NSWindow) {
             centerFilter(in: window)
+            guard showsTitle, let content = window.contentView,
+                  let container = content.superview?.subviews.first(where: {
+                      String(describing: type(of: $0)) == "NSTitlebarContainerView"
+                  }),
+                  let backdrop = container.subviews.first(where: {
+                      String(describing: type(of: $0)) == "NSTitlebarBackgroundView"
+                  }),
+                  let layer = backdrop.layer else {
+                backdropMask?.restore()
+                backdropMask = nil
+                return
+            }
+            if backdropMask?.layer !== layer {
+                backdropMask?.restore()
+                backdropMask = RectangularLayerMask(layer: layer)
+            }
+
+            let contentFrame = content.convert(content.bounds, to: nil)
+            let backdropFrame = backdrop.convert(backdrop.bounds, to: nil)
+            let rtl = window.windowTitlebarLayoutDirection == .rightToLeft
+            let width = BrowseLayout.detailLeadingInset
+            let sidebar = CGRect(x: rtl ? contentFrame.maxX - width : contentFrame.minX,
+                                 y: backdropFrame.minY, width: width, height: backdropFrame.height)
+            let visible = backdrop.convert(sidebar, from: nil).intersection(backdrop.bounds)
+            backdropMask?.update(visible.isEmpty ? .zero : visible)
         }
 
         private func centerFilter(in window: NSWindow) {

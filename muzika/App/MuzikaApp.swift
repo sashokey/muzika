@@ -12,7 +12,7 @@ struct MuzikaApp: App {
                 .onAppear { audioFiles.attach(state) }
         }
         .defaultSize(width: 1250, height: 880)
-        .windowStyle(.hiddenTitleBar)
+        .windowStyle(.titleBar)
         .windowResizability(.contentMinSize)
         .commands { MuzikaCommands(state: state) }
     }
