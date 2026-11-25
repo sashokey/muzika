@@ -234,7 +234,10 @@ private struct BrowseNativeScrollEdge: NSViewRepresentable {
         private func findScroll(in view: NSView, region: CGRect) -> NSScrollView? {
             if let scroll = view as? NSScrollView, hidesTitlebarBackdrop || scroll.documentView is NSTableView {
                 let frame = scroll.convert(scroll.bounds, to: nil)
-                if abs(frame.minX - region.minX) < 1, abs(frame.width - region.width) < 1,
+                let matchesWidth = abs(frame.minX - region.minX) < 1 && abs(frame.width - region.width) < 1
+                let fitsPaddedRegion = hidesTitlebarBackdrop && frame.minX >= region.minX - 1
+                    && frame.maxX <= region.maxX + 1
+                if matchesWidth || fitsPaddedRegion,
                    frame.minY - 1 <= region.minY, frame.maxY + 1 >= region.maxY {
                     return scroll
                 }

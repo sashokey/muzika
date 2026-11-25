@@ -1,6 +1,6 @@
 {
-  "version": "v11",
+  "version": "v12",
   "draft": false,
   "prerelease": false,
-  "notes": "- Add animated Shuffle on Home to start playback from the entire local library. Reduce rendering work while scrolling.\n- Use native window dragging between displays and keep one continuous glass header above scrolling library content.\n- Improve Up Next opening, row interactions, and artwork loading in long queues.\n- Open Audio info from the visualizer or format and provide a Get Info shortcut.\n- Add diagnostics to DebugLogs and regression tests for visible Home scrolling and lyric transitions.\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
+  "notes": "- Remove the extra blurred band above the Home heading when scrolling.\n\nKnown issue: Home scrolling may still stutter while the Shuffle animation is visible.\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
 }
