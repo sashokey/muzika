@@ -5,26 +5,12 @@
 - Handle user requests one at a time in the order received. Finish and verify the current request and deliver any requested build before investigating or starting the next one. Queue new requests that arrive meanwhile. Change the order only at the user's explicit direction.
 - Keep this file in English. Record agreed requirements, decision rationale, and verification results as work progresses. When the user clarifies a requirement, update the existing wording in the relevant section. Check this file against the latest messages and actual results before reporting completion.
 - Apply approvals to the controls discussed. Ask before choosing among materially different designs, moving adjacent buttons, changing their visual priority, or allocating a separate area. Compare the size and order of control groups with the approved layout.
-- Add new bug reports to the end of [Open Bugs](#open-bugs). When the user wants to revert styling independently, keep the fixes and styling in separate commits.
+- Create a [GitHub issue](https://github.com/sashokey/muzika/issues) for each new bug report or feature request from the user.
+- When the user wants to revert styling independently, keep the fixes and styling in separate commits.
 - Keep application launch in `MuzikaApp` and window layout and native title-bar accessories in `App/Window`. Keep the native track table, its scroll-edge adapter, and folder navigation in separate files under `Browse`.
 - Record bug details as text. Keep screenshots outside the repository.
 - When fixing a shared hover effect, check its other uses proactively, including scrollable sections, Settings, search states, and player panels.
 - Git changes, publication, and releases require a corresponding request. Preserve the root `LICENSE` history. Follow the release procedure in Naming, Versioning, and Distribution and the commit checks in Testing.
-
-## Open Bugs
-
-Fix these items when the user explicitly asks. Remove each item after verifying its fix.
-
-- [P1] Profile stutters when switching sections and low frame rates in the lyrics view. Identify and fix the root causes. Where the implementation approach is already optimal, profile it to find targeted optimizations. Keep the app lightweight and responsive, with smooth section transitions and lyrics updates even on the lowest-spec supported devices. Preserve the existing visual design throughout.
-  - Use the existing `Tests/Performance/run.sh` workflow with Release builds. Repeat section switching and automatic and manual lyric scrolling three times before and after the fix, using the same library, tracks, window size, and display refresh rate.
-  - Keep local profiling to normal app usage. Never run synthetic workloads, stress tests, or CPU or GPU load generators on the user's Mac. Verification on the lowest-spec supported devices remains pending until an approved test environment is available.
-  - Compare section switch latency, missed frames and frame intervals during motion, CPU time, GPU active time, and physical memory. Use Instruments to trace the bottleneck and compare matching visual states before and after to verify that the appearance is preserved.
-
-- [P0] Rapid scrolling in Songs still misses the 240 Hz frame budget. At 7,500 pt/s across 1,590 tracks, reusing the measured uniform row height raised display-link updates from 79.8 to 95.6/s and reduced p95 from 16.69 to 12.59 ms. Profile SwiftUI cells in the native table while preserving sorting, row height, and pinned column headers. Albums also fell to 177.6 updates/s in one rapid pass with simulated hover.
-
-- **Home** can show a second band of glass above its title after scrolling in v11. The local regression found an unmasked 44 pt native scroll backdrop in Home. The mask now accepts a scroll view inside a padded region, and the same visible-window layer check passes. Compare the composited appearance at the reported scroll position.
-- **Home** scrolling still lags with **Shuffle** visible. A visible trace of v11 showed about 57–58 displayed FPS during sustained window updates. The trace lacked gesture boundaries for per-pass figures. Verify actual frame pacing during trackpad scrolling using the 119 FPS criterion in [Testing](#testing).
-- A playback report showed Core Audio error `-10875`. Capture the audio output, playback mode, and the failing engine operation in DebugLogs before assigning a cause.
 
 ## Naming, Versioning, and Distribution
 
@@ -114,6 +100,7 @@ Fix these items when the user explicitly asks. Remove each item after verifying 
 
 ## Testing
 
+- Keep local profiling to normal app usage. Never run synthetic workloads, stress tests, or CPU or GPU load generators on the user's Mac.
 - In a sandboxed local macOS shell, request per-command escalation before the first attempt for these operations. State what will run and why it needs host access.
   - Application builds with `xcodebuild`, including `Release` and `DebugLogs`. Xcode needs access to host services to export `AppIcon.icon`.
   - Tests that decode or render audio through Core Audio, including offline playback checks and the execution phase of `Tests/Performance/run.sh`. The audio components need host access even for silent tests.
