@@ -16,6 +16,13 @@ struct NowPlayingView: View {
     @State private var visibleWindow = false
     @State private var fullscreenTopPadding: CGFloat?
     @State private var presentingAudioInfo = false
+    @MainActor
+    private enum PanelControlsLayout {
+        static let spacing: CGFloat = 6
+        static let padding: CGFloat = 6
+        static let width = 3 * PlayerIcon.size.width + 2 * spacing + 2 * padding
+    }
+
     private let panelControlsHeight: CGFloat = 40
 
     var body: some View {
@@ -162,10 +169,7 @@ struct NowPlayingView: View {
                     Text(track.title)
                         .font(.title2.bold())
                         .lineLimit(2)
-                    Text([track.artist, track.album].filter { !$0.isEmpty }.joined(separator: " · "))
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                    PlayingTrackCredits(track: track, navigate: state.navigate)
                 }
                 Spacer(minLength: 0)
                 Menu {
@@ -190,7 +194,10 @@ struct NowPlayingView: View {
                 .help("More")
                 .accessibilityLabel("More")
             }
-            Scrubber(playback: state.playback, duration: track.duration, editingTime: $editingTime)
+            Scrubber(
+                playback: state.playback, duration: track.duration, editingTime: $editingTime,
+                followsPlaybackClock: true, isVisible: visibleWindow
+            )
             fullTimeAndFormat(track)
             TransportControls(playback: state.playback, compact: false)
                 .padding(.top, 4)
@@ -202,16 +209,27 @@ struct NowPlayingView: View {
 
     private func fullTimeAndFormat(_ track: AudioTrack) -> some View {
         let position = editingTime ?? state.playback.position
+        let hoverOutset = CGSize(width: 6, height: 3)
         return HStack {
             Text(elapsedLabel(position)).monospacedDigit()
             Spacer(minLength: 2)
             Button {
                 presentingAudioInfo.toggle()
             } label: {
-                Label(track.quality, systemImage: "waveform").lineLimit(1)
+                Label {
+                    Text(track.quality)
+                } icon: {
+                    ArtworkSpectrumBadge(
+                        playback: state.playback, diameter: PlayerIcon.glyphSize,
+                        style: .audioInfo, isPresented: visibleWindow, width: PanelControlsLayout.width,
+                        verticalOutset: hoverOutset.height
+                    )
+                    .accessibilityHidden(true)
+                }
+                .lineLimit(1)
             }
             .buttonStyle(.plain)
-            .liquidGlassHover(in: Capsule(), outset: CGSize(width: 6, height: 3))
+            .liquidGlassHover(in: Capsule(), outset: hoverOutset)
             .help("Audio info")
             .accessibilityLabel("Audio info, \(track.quality)")
             .popover(isPresented: $presentingAudioInfo) {
@@ -264,7 +282,8 @@ struct NowPlayingView: View {
                         offset: state.preferences.lyricsOffset, textSize: state.preferences.lyricsSize,
                         blur: state.preferences.lyricsBlur && (!reduceTransparency || state.preferences.forceBlur),
                         seek: state.playback.seek(to:), topOverflow: topOverflow,
-                        positionSnapshot: { state.playback.position }
+                        positionSnapshot: { state.playback.position }, duration: state.playback.current?.duration,
+                        bottomClearance: panelControlsHeight + 12, isWindowVisible: visibleWindow
                     )
                     .id(trackID)
                     .transition(.opacity)
@@ -282,13 +301,13 @@ struct NowPlayingView: View {
     }
 
     private var panelControls: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: PanelControlsLayout.spacing) {
             PlayerVolumeButton(state: state, acceptsWheel: { state.showingPlayer })
             PlayerIcon("Lyrics", symbol: "quote.bubble", highlighted: state.panel == .lyrics) { state.togglePanel(.lyrics) }
             PlayerIcon("Up Next", symbol: "list.bullet", highlighted: state.panel == .queue) { state.togglePanel(.queue) }
         }
-        .padding(6)
-        .frame(height: panelControlsHeight)
+        .padding(PanelControlsLayout.padding)
+        .frame(width: PanelControlsLayout.width, height: panelControlsHeight)
         .glassEffect(.regular, in: .capsule)
     }
 

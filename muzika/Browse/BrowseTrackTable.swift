@@ -21,20 +21,8 @@ struct BrowseTrackTable: View {
         let rows = sorting == nil ? ownSorting?.sorted(tracks) ?? tracks : tracks
         Table(rows, selection: $selection, sortOrder: headerSorting) {
             TableColumn(BrowseSort.title.displayTitle, sortUsing: TrackSortOrder(key: .title)) { track in
-                trackCell(HStack(spacing: 7) {
-                    BrowseArtwork(
-                        library: library, track: track, pixelSize: 64,
-                        cornerRadius: usesSongsArtwork ? 2 : BrowseArtwork.defaultCornerRadius
-                    )
-                        .frame(width: 22, height: 22)
-                        .overlay {
-                            if playback.current?.id == track.id {
-                                ArtworkSpectrumBadge(
-                                    playback: playback, diameter: usesSongsArtwork ? 22 : 19,
-                                    style: usesSongsArtwork ? .songs : .circle
-                                )
-                            }
-                        }
+                trackCell(HStack(spacing: usesSongsArtwork ? 0 : ArtworkPlaybackLayout.songArtworkGap) {
+                    trackArtwork(track, in: rows)
                     Text(track.title).lineLimit(1)
                 })
             }
@@ -88,6 +76,30 @@ struct BrowseTrackTable: View {
         }
         .onChange(of: selection.isEmpty ? [] : rows.map(\.id)) { _, ids in selection.formIntersection(ids) }
         .sheet(item: $details) { TrackInfoView(library: library, track: $0) }
+    }
+
+    @ViewBuilder
+    private func trackArtwork(_ track: AudioTrack, in rows: [AudioTrack]) -> some View {
+        let size = ArtworkPlaybackLayout.songArtworkSize
+        let artwork = BrowseArtwork(
+            library: library, track: track, pixelSize: 64,
+            cornerRadius: usesSongsArtwork ? 2 : BrowseArtwork.defaultCornerRadius
+        )
+        .frame(width: size, height: size)
+        if usesSongsArtwork {
+            artwork
+                .frame(width: ArtworkPlaybackLayout.song.hitWidth, alignment: .leading)
+                .modifier(ArtworkPlaybackModifier(
+                    library: library, target: .track(track, queue: rows), playback: playback,
+                    layout: .song, beforePlay: beforePlay, cardHoverOutset: nil
+                ))
+        } else {
+            artwork.overlay {
+                if playback.current?.id == track.id {
+                    ArtworkSpectrumBadge(playback: playback, diameter: 19, style: .circle)
+                }
+            }
+        }
     }
 
     @ViewBuilder

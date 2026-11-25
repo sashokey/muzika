@@ -374,7 +374,7 @@ private struct RecentlyAddedPage: View {
             VStack(spacing: 0) {
                 BrowseHeading(title: String(localized: "Library")) {
                     Button("Add Folder", systemImage: "folder.badge.plus", action: addFolder)
-                        .buttonStyle(GlassHoverButtonStyle())
+                        .buttonStyle(GlassHoverButtonStyle.action())
                         .disabled(library.isScanning)
                 }
                 status
@@ -468,29 +468,26 @@ struct GroupBrowserPage: View {
         }
         .browseGlassHeader {
             BrowseHeading(title: route.title, subtitle: String(localized: "Total: \(self.groups.count)")) {
-                if route == .albums {
-                    Menu("Filters", systemImage: "line.3.horizontal.decrease") {
-                        Picker("Album Completeness", selection: $completeness) {
-                            Text("All Albums").tag(AlbumCompleteness?.none)
-                            ForEach(AlbumCompleteness.allCases, id: \.self) { status in
-                                Text(status.displayTitle).tag(Optional(status))
-                            }
-                        }
-                    }
-                    .glassHoverMenu()
-                }
-                Menu("Sort", systemImage: "arrow.up.arrow.down") {
-                    Picker("Sort", selection: $arrangement) {
-                        ForEach(GroupArrangement.allCases, id: \.self) { item in
-                            Text(item.displayTitle).tag(item)
-                        }
-                    }
-                }
-                .glassHoverMenu()
+                BrowseHeaderMenus(menus: headerMenus)
             }
             .padding(.horizontal, 26)
         }
         .windowLibraryFilter(text: $query, prompt: filterPrompt)
+    }
+
+    private var headerMenus: [BrowseHeaderMenu] {
+        let sort = BrowseHeaderMenu(id: .sort, title: "Sort", symbol: "arrow.up.arrow.down", entries:
+            BrowseHeaderMenuEntry.choices(GroupArrangement.allCases, selection: $arrangement) { Text($0.displayTitle) }
+        )
+        guard route == .albums else { return [sort] }
+        let filters = BrowseHeaderMenu(id: .filters, title: "Filters", symbol: "line.3.horizontal.decrease", entries: [
+            .submenu("Album Completeness",
+                BrowseHeaderMenuEntry.choices([nil] + AlbumCompleteness.allCases.map(Optional.some), selection: $completeness) {
+                    if let status = $0 { Text(status.displayTitle) } else { Text("All Albums") }
+                }
+            )
+        ])
+        return [filters, sort]
     }
 
     private var emptyLibraryTitle: LocalizedStringResource {

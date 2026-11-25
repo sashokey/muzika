@@ -84,6 +84,7 @@ final class LyricsRowLayer {
         let hovered: Bool
         let softened: Bool
         let wordTime: Double
+        let fillInterval: Range<Double>?
     }
 
     init(line: LyricsLine, typography: LyricsTypography, heights: [CGFloat], deviceScale: CGFloat, blur: Bool) {
@@ -91,7 +92,10 @@ final class LyricsRowLayer {
         let width = max(1, typography.textWidth - indent)
         var y: CGFloat = 0
         blocks = zip(typography.blocks(for: line), heights).map { text, height in
-            let block = LyricsBlockLayer(text: text, size: CGSize(width: width, height: height), scale: deviceScale, blur: blur)
+            let block = LyricsBlockLayer(
+                text: text, size: CGSize(width: width, height: height), scale: deviceScale, blur: blur,
+                supportsLineFill: line.start != nil && text.isPrimary && text.words.isEmpty
+            )
             block.layer.frame.origin = CGPoint(x: indent, y: y)
             y += height + typography.auxiliarySpacing
             return block
@@ -108,6 +112,12 @@ final class LyricsRowLayer {
         let animate = animated && appearance != nil
         appearance = state
         for block in blocks { block.update(state, animated: animate) }
+    }
+
+    var hasLineFill: Bool { appearance?.fillInterval != nil }
+
+    func paintLineFill(at position: Double) {
+        for block in blocks { block.paintLineFill(at: position) }
     }
 
     func paintAccents(at position: Double, motion: LyricsAccentMotion, reposition: Bool = false) {
@@ -173,6 +183,9 @@ private final class LyricsBlockLayer {
     private let permitsBlur: Bool
     private let text: LyricsTextBlock
     private let wordInk: [WordInk]
+    private let lineInk: WordInk?
+    private var fillInterval: Range<Double>?
+    private var fillProgress: Double?
     private var wordTime: Double?
     private var activeWords: [Int] = []
     private var accentMotion: LyricsAccentMotion?
@@ -185,7 +198,7 @@ private final class LyricsBlockLayer {
     private static let scaleKey = "lyrics-emphasis-scale"
     private static let blurContext = CIContext(options: [.cacheIntermediates: false, .useSoftwareRenderer: true])
 
-    init(text: LyricsTextBlock, size: CGSize, scale: CGFloat, blur: Bool) {
+    init(text: LyricsTextBlock, size: CGSize, scale: CGFloat, blur: Bool, supportsLineFill: Bool) {
         self.text = text
         permitsBlur = blur
         let rect = CGRect(origin: .zero, size: size)
@@ -201,10 +214,18 @@ private final class LyricsBlockLayer {
         if let primary {
             base = CALayer()
             base.contents = primary
-            wordInk = Self.wordGeometry(in: frame, height: size.height, ranges: text.wordRanges)
-            if !wordInk.isEmpty {
+            if supportsLineFill {
+                let range = 0..<text.text.utf16.count
+                lineInk = Self.wordGeometry(in: frame, height: size.height, ranges: [range]).first
+                wordInk = []
+            } else {
+                lineInk = nil
+                wordInk = Self.wordGeometry(in: frame, height: size.height, ranges: text.wordRanges)
+            }
+            if !wordInk.isEmpty || lineInk != nil {
                 completed.contents = primary
-                current.contents = Self.image(frame, size: size, scale: scale, color: NSColor.controlAccentColor.cgColor)
+                current.contents = lineInk != nil
+                    ? primary : Self.image(frame, size: size, scale: scale, color: NSColor.controlAccentColor.cgColor)
                 for (colored, mask) in [(completed, completedMask), (current, currentMask)] {
                     colored.frame = rect
                     colored.contentsScale = scale
@@ -222,21 +243,21 @@ private final class LyricsBlockLayer {
             fallback.alignmentMode = .natural
             base = fallback
             wordInk = []
+            lineInk = nil
         }
         base.frame = rect
         base.contentsScale = scale
         layer.addSublayer(base)
-        if !wordInk.isEmpty {
-            layer.addSublayer(completed)
-            layer.addSublayer(current)
-        }
+        if !wordInk.isEmpty { layer.addSublayer(completed) }
+        if !wordInk.isEmpty || lineInk != nil { layer.addSublayer(current) }
     }
 
     func update(_ appearance: LyricsRowLayer.Appearance, animated: Bool) {
         let wordsActive = appearance.singing && !wordInk.isEmpty
+        let lineFills = appearance.fillInterval != nil && (lineInk?.width ?? 0) > 0
         let idle = appearance.hovered ? (appearance.idleOpacity + 1) / 2 : appearance.idleOpacity
         let opacity: Float = text.isPrimary
-            ? (appearance.dimmed ? idle : (wordsActive ? 0.65 : 1))
+            ? (appearance.dimmed ? idle : (wordsActive || lineFills ? 0.65 : 1))
             : 0.65
         let oldOpacity = base.presentation()?.opacity ?? base.opacity
         if base.opacity != opacity {
@@ -262,6 +283,16 @@ private final class LyricsBlockLayer {
             base.contents = showingSoft ? (soft ?? sharp) : sharp
         }
         updateScale(appearance.dimmed ? 0.97 : 1, animated: animated)
+        if lineInk != nil {
+            let interval = lineFills ? appearance.fillInterval : nil
+            if fillInterval != interval {
+                fillInterval = interval
+                fillProgress = nil
+                current.isHidden = interval == nil
+                currentMask.path = nil
+            }
+            return
+        }
         let nextTime = wordsActive ? appearance.wordTime : nil
         if nextTime != wordTime {
             wordTime = nextTime
@@ -303,6 +334,24 @@ private final class LyricsBlockLayer {
 
     func stopScaleAnimation() {
         layer.removeAnimation(forKey: Self.scaleKey)
+    }
+
+    func paintLineFill(at position: Double) {
+        guard let fillInterval, let lineInk else { return }
+        let duration = fillInterval.upperBound - fillInterval.lowerBound
+        let progress = min(1, max(0, (position - fillInterval.lowerBound) / duration))
+        guard fillProgress != progress else { return }
+        fillProgress = progress
+        let path = CGMutablePath()
+        if progress >= 1 {
+            path.addRect(layer.bounds)
+        } else if progress > 0 {
+            lineInk.append(to: path, progress: progress)
+        }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        currentMask.path = path
+        CATransaction.commit()
     }
 
     func paintAccents(at position: Double, motion: LyricsAccentMotion, reposition: Bool) {

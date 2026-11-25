@@ -1,11 +1,20 @@
+import AppKit
 import SwiftUI
 
 enum GlassHoverMotion {
-    static let appearance = Animation.smooth(duration: 0.20)
+    static let duration: TimeInterval = 0.20
+    static let appearance = Animation.smooth(duration: duration)
     static let initialScale: CGFloat = 0.96
 }
 
 extension View {
+    func stableHover(_ perform: @escaping (Bool) -> Void) -> some View {
+        background {
+            StableHoverRegion(perform: perform)
+                .accessibilityHidden(true)
+        }
+    }
+
     func liquidGlassHover(outset: CGSize = CGSize(width: 1, height: 1), hovered: Bool? = nil) -> some View {
         modifier(LiquidGlassHover(outline: RoundedRectangle(cornerRadius: 8), outset: outset, hoverOverride: hovered))
     }
@@ -33,9 +42,10 @@ extension View {
     }
 
     func liquidGlassHover<Outline: InsettableShape>(
-        in outline: Outline, outset: CGSize = CGSize(width: 1, height: 1), scale: CGFloat = 1
+        in outline: Outline, outset: CGSize = CGSize(width: 1, height: 1), scale: CGFloat = 1,
+        stableTracking: Bool = false
     ) -> some View {
-        modifier(LiquidGlassHover(outline: outline, outset: outset, scale: scale))
+        modifier(LiquidGlassHover(outline: outline, outset: outset, scale: scale, stableTracking: stableTracking))
     }
 }
 
@@ -44,6 +54,7 @@ private struct LiquidGlassHover<Outline: InsettableShape>: ViewModifier {
     var outset = CGSize(width: 1, height: 1)
     var selectionTint = false
     var scale: CGFloat = 1
+    var stableTracking = false
     var usesListRowHeight = false
     var restingFill: AnyShapeStyle?
     var hoverOverride: Bool?
@@ -53,9 +64,10 @@ private struct LiquidGlassHover<Outline: InsettableShape>: ViewModifier {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var hovered = false
 
+    @ViewBuilder
     func body(content: Content) -> some View {
         let visible = (hoverOverride ?? hovered) && isEnabled
-        content
+        let surface = content
             .background {
                 ZStack {
                     if visible {
@@ -73,7 +85,13 @@ private struct LiquidGlassHover<Outline: InsettableShape>: ViewModifier {
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
             }
-            .onHover { hovered = $0 }
+        if hoverOverride != nil {
+            surface
+        } else if stableTracking {
+            surface.stableHover { hovered = $0 }
+        } else {
+            surface.onHover { hovered = $0 }
+        }
     }
 
     @ViewBuilder
@@ -119,15 +137,60 @@ private struct GlassHoverReveal: ViewModifier, Animatable {
     }
 }
 
+private struct StableHoverRegion: NSViewRepresentable {
+    let perform: (Bool) -> Void
+
+    func makeNSView(context: Context) -> TrackingView {
+        TrackingView()
+    }
+
+    func updateNSView(_ view: TrackingView, context: Context) {
+        view.perform = perform
+    }
+
+    final class TrackingView: NSView {
+        var perform: ((Bool) -> Void)?
+
+        init() {
+            super.init(frame: .zero)
+            addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                                           owner: self, userInfo: nil))
+        }
+
+        required init?(coder: NSCoder) { nil }
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+        override func mouseEntered(with event: NSEvent) { perform?(true) }
+        override func mouseExited(with event: NSEvent) { perform?(false) }
+    }
+}
+
 struct GlassHoverButtonStyle: ButtonStyle {
+    enum HoverAppearance {
+        case glass
+        case stableGlass
+        case color
+    }
+
     var prominent = false
     var iconSymbol: String?
     var showsMenuIndicator = false
+    var hoverAppearance = HoverAppearance.glass
+
+    static func action(
+        prominent: Bool = false, iconSymbol: String? = nil, showsMenuIndicator: Bool = false
+    ) -> Self {
+        Self(prominent: prominent, iconSymbol: iconSymbol, showsMenuIndicator: showsMenuIndicator, hoverAppearance: .stableGlass)
+    }
+
+    static var playback: Self {
+        Self(prominent: true, hoverAppearance: .color)
+    }
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.modifier(GlassHoverButtonSurface(
             prominent: prominent, iconSymbol: iconSymbol, role: configuration.role, pressed: configuration.isPressed,
-            showsMenuIndicator: showsMenuIndicator
+            showsMenuIndicator: showsMenuIndicator, hoverAppearance: hoverAppearance
         ))
     }
 }
@@ -138,12 +201,14 @@ private struct GlassHoverButtonSurface: ViewModifier {
     let role: ButtonRole?
     let pressed: Bool
     let showsMenuIndicator: Bool
+    let hoverAppearance: GlassHoverButtonStyle.HoverAppearance
     @Environment(\.controlSize) private var controlSize
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var hovered = false
 
+    @ViewBuilder
     func body(content: Content) -> some View {
         let visible = hovered && isEnabled
         let glass = visible && !reduceTransparency
@@ -167,22 +232,43 @@ private struct GlassHoverButtonSurface: ViewModifier {
         let fallback: Color = prominent ? .accentColor.opacity(0.85) : .primary.opacity(pressed ? 0.2 : 0.12)
         let iconOnly = iconSymbol != nil
 
-        label(content, height: height, fontSize: fontSize)
+        let button = label(content, height: height, fontSize: fontSize)
             .font(.system(size: fontSize))
             .foregroundStyle(foreground)
             .padding(.horizontal, iconOnly ? 0 : height / 2)
             .frame(minWidth: iconOnly ? height + 10 : nil, minHeight: height)
             .background {
-                let fill: Color = glass ? .clear : visible ? fallback : restingFill
-                outline.fill(fill)
-                    .glassEffect(glass ? (prominent ? .regular.tint(.accentColor) : .regular) : .identity, in: outline)
-                    .animation(reduceMotion ? nil : GlassHoverMotion.appearance, value: visible)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
+                let material: Glass = prominent ? .regular.tint(.accentColor) : .regular
+                Group {
+                    switch hoverAppearance {
+                    case .color:
+                        outline.fill(visible ? Color.accentColor.mix(with: .black, by: 0.12) : restingFill)
+                    case .stableGlass:
+                        ZStack {
+                            outline.fill(visible ? fallback : restingFill)
+                                .opacity(glass ? 0 : 1)
+                            if !reduceTransparency {
+                                Color.clear.glassEffect(material, in: outline)
+                                    .opacity(glass ? 1 : 0)
+                            }
+                        }
+                    case .glass:
+                        let fill: Color = glass ? .clear : visible ? fallback : restingFill
+                        outline.fill(fill)
+                            .glassEffect(glass ? material : .identity, in: outline)
+                    }
+                }
+                .animation(reduceMotion ? nil : GlassHoverMotion.appearance, value: visible)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
             }
             .contentShape(outline)
             .opacity(isEnabled ? 1 : 0.5)
-            .onHover { hovered = $0 }
+        if hoverAppearance != .glass {
+            button.stableHover { hovered = $0 }
+        } else {
+            button.onHover { hovered = $0 }
+        }
     }
 
     @ViewBuilder

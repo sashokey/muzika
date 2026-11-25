@@ -497,7 +497,7 @@ struct BrowseHeading<Actions: View>: View {
             if let back {
                 Button("Back", systemImage: "chevron.left", action: back)
                     .labelStyle(.iconOnly)
-                    .buttonStyle(GlassHoverButtonStyle(iconSymbol: "chevron.backward"))
+                    .buttonStyle(GlassHoverButtonStyle.action(iconSymbol: "chevron.backward"))
                     .accessibilityLabel("Back")
                     .help("Back")
             }

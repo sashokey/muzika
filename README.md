@@ -1,5 +1,7 @@
 A native offline music player for Apple silicon Macs running macOS 27 or later. It plays local audio files and supports library browsing, playback queues, listening history, and synchronized lyrics.
 
+![MUZIKA? Now Playing with synchronized lyrics](docs/now-playing.png)
+
 ## Installation
 
 Download the app archive from the repository’s Releases page. Unzip it and move the app to Applications.

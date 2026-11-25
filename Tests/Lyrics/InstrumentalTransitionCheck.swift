@@ -92,7 +92,7 @@ private final class InstrumentalTransitionCheck: NSObject, NSApplicationDelegate
             try expect(abs(start - before) < 0.75, "Incoming line jumped by \(start - before) pt")
             try expect(countdown.superlayer === tiles, "Countdown vanished in one frame")
             try expect(abs(screenY(countdown, tiles: tiles, view: view) - countdownY) < 0.75, "Countdown moved before fading")
-            try expect(countdown.opacity == 0 && ink.opacity == 1, "Incorrect final countdown or emphasis opacity")
+            try expect(countdown.opacity == 0 && ink.opacity == 0.65, "The next lyric must start at its unfilled brightness")
 
             if window.isVisible {
                 if let preceding, let precedingY {
@@ -103,7 +103,7 @@ private final class InstrumentalTransitionCheck: NSObject, NSApplicationDelegate
                 let fade = try require(countdown.animation(forKey: "lyrics-countdown-fade") as? CABasicAnimation, "Missing countdown fade")
                 let emphasis = try require(ink.animation(forKey: "emphasis") as? CABasicAnimation, "Incoming line changed brightness in one frame")
                 try expect(number(fade.fromValue) == 1 && number(fade.toValue) == 0, "Incorrect countdown fade range")
-                try expect(number(emphasis.fromValue) == 0.5 && number(emphasis.toValue) == 1, "Incorrect emphasis range")
+                try expect(number(emphasis.fromValue) == 0.5 && abs(number(emphasis.toValue) - 0.65) < 0.001, "Incorrect emphasis range")
                 try await Task.sleep(for: .milliseconds(80))
                 try expect(window.occlusionState.contains(.visible) && !window.isKeyWindow && !NSApp.isActive, "The check window lost visibility or took focus")
                 let middle = screenY(line, tiles: tiles, view: view, presented: true)

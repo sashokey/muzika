@@ -22,53 +22,40 @@ struct PlayTracksMenu: View {
     }
 }
 
-struct BrowseTrackSortMenu: View {
-    @Binding var sort: BrowseSort
-    @Binding var descending: Bool
-
-    var body: some View {
-        Menu("Sort", systemImage: "arrow.up.arrow.down") {
-            Picker("Sort By", selection: $sort) {
-                ForEach(BrowseSort.allCases) { order in
-                    Text(order.displayTitle).tag(order)
-                }
+extension BrowseHeaderMenu {
+    static func trackSort(_ sort: Binding<TrackSortOrder>) -> Self {
+        Self(id: .sort, title: "Sort", symbol: "arrow.up.arrow.down", entries: [
+            .submenu("Sort By", BrowseHeaderMenuEntry.choices(BrowseSort.allCases, selection: sort.key) {
+                Text($0.displayTitle)
+            }),
+            .separator,
+            .command(Text("Reverse Order"), selected: sort.wrappedValue.descending) {
+                sort.wrappedValue.descending.toggle()
             }
-            Divider()
-            Toggle("Reverse Order", isOn: $descending)
-        }
-        .glassHoverMenu()
+        ])
     }
-}
 
-struct BrowseTrackFiltersMenu: View {
-    @Binding var filters: OfflineTrackFilters
-    let tracks: [AudioTrack]
-
-    var body: some View {
+    static func trackFilters(_ filters: Binding<OfflineTrackFilters>, tracks: [AudioTrack]) -> Self {
+        let value = filters.wrappedValue
         let formats = Set(tracks.map { $0.url.pathExtension.lowercased() })
-            .union(filters.format.map { [$0] } ?? []).filter { !$0.isEmpty }.sorted()
-        Menu("Filters", systemImage: filters == .init() ? "line.3.horizontal.decrease" : "line.3.horizontal.decrease.circle.fill") {
-            Picker("Quality", selection: $filters.quality) {
-                ForEach(OfflineTrackFilters.Quality.allCases, id: \.self) { item in
-                    Text(item.displayTitle).tag(item)
-                }
-            }
-            Picker("Format", selection: $filters.format) {
-                Text("All").tag(String?.none)
-                ForEach(formats, id: \.self) { format in
-                    Text(format.uppercased()).tag(Optional(format))
-                }
-            }
-            Picker("Metadata", selection: $filters.metadata) {
-                ForEach(OfflineTrackFilters.Metadata.allCases, id: \.self) { item in
-                    Text(item.displayTitle).tag(item)
-                }
-            }
-            Divider()
-            Button("Reset") { filters = .init() }
-                .disabled(filters == .init())
-        }
-        .glassHoverMenu()
+            .union(value.format.map { [$0] } ?? []).filter { !$0.isEmpty }.sorted()
+        return Self(
+            id: .filters, title: "Filters",
+            symbol: value == .init() ? "line.3.horizontal.decrease" : "line.3.horizontal.decrease.circle.fill",
+            entries: [
+                .submenu("Quality", BrowseHeaderMenuEntry.choices(OfflineTrackFilters.Quality.allCases, selection: filters.quality) {
+                    Text($0.displayTitle)
+                }),
+                .submenu("Format", BrowseHeaderMenuEntry.choices([nil] + formats.map(Optional.some), selection: filters.format) {
+                    if let format = $0 { Text(format.uppercased()) } else { Text("All") }
+                }),
+                .submenu("Metadata", BrowseHeaderMenuEntry.choices(OfflineTrackFilters.Metadata.allCases, selection: filters.metadata) {
+                    Text($0.displayTitle)
+                }),
+                .separator,
+                .command(Text("Reset"), selected: false, enabled: value != .init()) { filters.wrappedValue = .init() }
+            ]
+        )
     }
 }
 
@@ -80,9 +67,9 @@ struct BrowsePlaybackButtons: View {
     var body: some View {
         HStack(spacing: 10) {
             Button("Play", systemImage: "play.fill") { playback.play(tracks, shuffled: false) }
-                .buttonStyle(GlassHoverButtonStyle(prominent: true))
+                .buttonStyle(GlassHoverButtonStyle.playback)
             Button("Shuffle", systemImage: "shuffle") { playback.play(tracks, shuffled: true) }
-                .buttonStyle(GlassHoverButtonStyle())
+                .buttonStyle(GlassHoverButtonStyle.action())
         }
         .disabled(tracks.isEmpty)
     }

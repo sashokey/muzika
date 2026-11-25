@@ -25,10 +25,10 @@ struct BrowseTrackRows: View {
                 BrowseTrackRow(library: library, track: track)
             }
             .buttonStyle(.plain)
-            .liquidGlassHover(outset: BrowseTrackRow.hoverOutset)
             .modifier(ArtworkPlaybackModifier(
                 library: library, target: .track(track, queue: tracks), playback: playback,
-                compact: true, effectsTrack: showsPlaybackEffects ? track : nil, beforePlay: beforePlay
+                layout: .row, effectsTrack: showsPlaybackEffects ? track : nil, beforePlay: beforePlay,
+                cardHoverOutset: BrowseTrackRow.hoverOutset
             ))
             .contextMenu {
                 PlayTracksMenu(tracks: [track], playback: playback)
@@ -107,10 +107,10 @@ struct BrowseSongGrid: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .liquidGlassHover(outset: BrowseArtwork.cardHoverOutset)
                 .modifier(ArtworkPlaybackModifier(
                     library: library, target: .track(track, queue: tracks), playback: playback,
-                    compact: false, effectsTrack: showsPlaybackEffects ? track : nil, beforePlay: beforePlay
+                    layout: .grid, effectsTrack: showsPlaybackEffects ? track : nil, beforePlay: beforePlay,
+                    cardHoverOutset: BrowseArtwork.cardHoverOutset
                 ))
                 .contextMenu {
                     PlayTracksMenu(tracks: [track], playback: playback)

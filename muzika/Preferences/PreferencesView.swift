@@ -91,29 +91,15 @@ struct PreferencesView: View {
     }
 
     private var searchField: some View {
-        HStack(spacing: 7) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-            TextField("Search settings", text: $query)
-                .textFieldStyle(.plain)
-                .focused($searchFocused)
-                .onSubmit {
-                    if let first = results.first { select(first) }
-                }
-            if !query.isEmpty {
-                Button("Clear search", systemImage: "xmark.circle.fill") {
-                    query = ""
-                    searchSelection = nil
-                    searchFocused = true
-                }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+        LibrarySearchField(
+            title: "Search settings", clearTitle: "Clear search", query: $query, focused: $searchFocused,
+            onSubmit: {
+                if let first = results.first { select(first) }
+            }, onClear: {
+                searchSelection = nil
+                searchFocused = true
             }
-        }
-        .padding(8)
-        .liquidGlassHover(restingFill: .quaternary.opacity(0.5))
+        )
     }
 
     private func select(_ item: PreferencesItem) {
@@ -151,6 +137,7 @@ struct PreferencesView: View {
                 .accessibilityAddTraits(.isHeader)
             ScrollViewReader { scroll in
                 settingsForm(for: page)
+                    .formStyle(.grouped)
                     .padding(.horizontal, -14)
                     .task(id: searchSelection) {
                         guard let searchSelection, searchSelection.item.page == page else { return }
@@ -178,10 +165,8 @@ struct PreferencesView: View {
             Form {
                 Section("Effects") {
                     Toggle(PreferencesItem.heroAnimations.title, isOn: $preferences.heroAnimations)
-                        .liquidGlassHover()
                         .id(PreferencesItem.heroAnimations)
                     Toggle(PreferencesItem.blurEffects.title, isOn: $preferences.forceBlur)
-                        .liquidGlassHover()
                         .id(PreferencesItem.blurEffects)
                 }
                 Section("Layout") {
@@ -199,44 +184,33 @@ struct PreferencesView: View {
                         .onChange(of: history.continueListening) { _, value in
                             UserDefaults.standard.set(value, forKey: "appearance.continueListening")
                         }
-                        .liquidGlassHover()
                         .id(PreferencesItem.continueListening)
                 }
             }
-            .formStyle(.grouped)
         case .playback:
             Form {
                 Section("Volume and transitions") {
                     Toggle(PreferencesItem.loudVolume.title, isOn: $preferences.confirmLoudVolume)
-                        .liquidGlassHover()
                         .id(PreferencesItem.loudVolume)
-                    LabeledContent(PreferencesItem.loudVolumeThreshold.title) {
-                        Slider(value: $preferences.loudVolumeLevel, in: 0.4...0.95, step: 0.05) {
-                            Text(PreferencesItem.loudVolumeThreshold.title)
-                        }
-                        .frame(maxWidth: 175)
-                        .liquidGlassHover()
-                        Text(preferences.loudVolumeLevel, format: .percent.precision(.fractionLength(0)))
-                            .monospacedDigit()
-                            .frame(minWidth: 38)
-                    }
+                    SettingsSliderRow(
+                        title: Text(PreferencesItem.loudVolumeThreshold.title),
+                        value: $preferences.loudVolumeLevel, range: 0.4...0.95, step: 0.05,
+                        valueLabel: Text(preferences.loudVolumeLevel, format: .percent.precision(.fractionLength(0))),
+                        minValueWidth: 38
+                    )
                     .disabled(!preferences.confirmLoudVolume)
                     .id(PreferencesItem.loudVolumeThreshold)
                     Toggle(PreferencesItem.gapless.title, isOn: $playback.gapless)
-                        .liquidGlassHover()
                         .id(PreferencesItem.gapless)
                     Toggle(PreferencesItem.spatialAudio.title, isOn: $playback.spatialAudio)
                         .help("Uses Spatial Audio when supported by your audio output.")
                         .accessibilityHint("Uses Spatial Audio when supported by your audio output.")
-                        .liquidGlassHover()
                         .id(PreferencesItem.spatialAudio)
                 }
                 Section("Queue") {
                     Toggle(PreferencesItem.noDuplicates.title, isOn: $playback.preventDuplicates)
-                        .liquidGlassHover()
                         .id(PreferencesItem.noDuplicates)
                     Toggle(PreferencesItem.lockQueue.title, isOn: $playback.queueLocked)
-                        .liquidGlassHover()
                         .id(PreferencesItem.lockQueue)
                 }
                 Section("Cover art") {
@@ -250,55 +224,37 @@ struct PreferencesView: View {
                     .labelsHidden()
                     .accessibilityLabel("Cover art")
                     .pickerStyle(.inline)
-                    .liquidGlassHover(outset: CGSize(width: 6, height: 4))
                     .id(PreferencesItem.coverArt)
                 }
                 Section("Listening statistics") {
                     Button(PreferencesItem.listeningStatistics.title) { state.navigate(.statistics) }
-                        .buttonStyle(GlassHoverButtonStyle())
+                        .buttonStyle(GlassHoverButtonStyle.action())
                         .id(PreferencesItem.listeningStatistics)
                 }
             }
-            .formStyle(.grouped)
         case .lyrics:
             Form {
                 Section("Appearance") {
-                    LabeledContent(PreferencesItem.lyricsSize.title) {
-                        Slider(value: $preferences.lyricsSize, in: 0.8...1.4, step: 0.05) {
-                            Text("Lyrics text size")
-                        }
-                        .frame(maxWidth: 175)
-                        .liquidGlassHover()
-                        Text(preferences.lyricsSize, format: .percent.precision(.fractionLength(0)))
-                            .monospacedDigit()
-                            .frame(minWidth: 46)
-                        Button("Reset") { preferences.lyricsSize = 1 }
-                            .buttonStyle(GlassHoverButtonStyle())
-                            .disabled(preferences.lyricsSize == 1)
-                    }
+                    SettingsSliderRow(
+                        title: Text(PreferencesItem.lyricsSize.title),
+                        value: $preferences.lyricsSize, range: 0.8...1.4, step: 0.05,
+                        valueLabel: Text(preferences.lyricsSize, format: .percent.precision(.fractionLength(0))),
+                        resetValue: 1
+                    )
                     .id(PreferencesItem.lyricsSize)
                     Toggle(PreferencesItem.lyricsBlur.title, isOn: $preferences.lyricsBlur)
-                        .liquidGlassHover()
                         .id(PreferencesItem.lyricsBlur)
                 }
                 Section("Lyrics timing") {
-                    LabeledContent("All songs") {
-                        Slider(value: $preferences.lyricsOffset, in: -2...2, step: 0.05) {
-                            Text("Lyrics timing")
-                        }
-                        .frame(maxWidth: 175)
-                        .liquidGlassHover()
-                        Text(timingLabel(preferences.lyricsOffset))
-                            .monospacedDigit()
-                            .frame(minWidth: 82)
-                        Button("Reset") { preferences.lyricsOffset = 0 }
-                            .buttonStyle(GlassHoverButtonStyle())
-                            .disabled(preferences.lyricsOffset == 0)
-                    }
+                    SettingsSliderRow(
+                        title: Text("All songs"),
+                        value: $preferences.lyricsOffset, range: -2...2, step: 0.05,
+                        valueLabel: Text(timingLabel(preferences.lyricsOffset)),
+                        accessibilityTitle: Text("Lyrics timing"), minValueWidth: 82, resetValue: 0
+                    )
                     .id(PreferencesItem.lyricsTiming)
                 }
             }
-            .formStyle(.grouped)
         case .localLibrary:
             LibraryPreferences(state: state)
         case .keyboardShortcuts:
@@ -313,7 +269,6 @@ struct PreferencesView: View {
                     }
                 }
             }
-            .formStyle(.grouped)
             .id(PreferencesItem.keyboardShortcuts)
         case .storage:
             CachePreferences(library: state.library)
@@ -330,7 +285,6 @@ struct PreferencesView: View {
                     }
                 }
             }
-            .formStyle(.grouped)
         }
     }
 
@@ -338,6 +292,66 @@ struct PreferencesView: View {
         guard offset != 0 else { return String(localized: "In sync") }
         let magnitude = abs(offset).formatted(.number.precision(.fractionLength(2)))
         return offset < 0 ? String(localized: "\(magnitude) s earlier") : String(localized: "\(magnitude) s later")
+    }
+}
+
+private struct SettingsSliderRow: View {
+    let title: Text
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let step: Double
+    let valueLabel: Text
+    var accessibilityTitle: Text?
+    var minValueWidth: CGFloat = 46
+    var resetValue: Double?
+
+    @Environment(\.layoutDirection) private var layoutDirection
+
+    private var steppedValue: Binding<Double> {
+        Binding(get: { value }, set: setValue)
+    }
+
+    var body: some View {
+        LabeledContent {
+            Slider(value: steppedValue, in: range) { accessibilityTitle ?? title }
+                .labelsHidden()
+                .accessibilityValue(valueLabel)
+                .accessibilityAdjustableAction { direction in
+                    switch direction {
+                    case .increment: setValue(value + step)
+                    case .decrement: setValue(value - step)
+                    @unknown default: break
+                    }
+                }
+                .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow], phases: [.down, .repeat]) { press in
+                    guard press.modifiers.isEmpty else { return .ignored }
+                    let increases = switch press.key {
+                    case .upArrow: true
+                    case .downArrow: false
+                    case .rightArrow: layoutDirection == .leftToRight
+                    default: layoutDirection == .rightToLeft
+                    }
+                    setValue(value + (increases ? step : -step))
+                    return .handled
+                }
+                .frame(maxWidth: 175)
+            valueLabel
+                .monospacedDigit()
+                .frame(minWidth: minValueWidth)
+            if let resetValue {
+                Button("Reset") { value = resetValue }
+                    .buttonStyle(GlassHoverButtonStyle.action())
+                    .disabled(value == resetValue)
+            }
+        } label: {
+            title
+        }
+    }
+
+    private func setValue(_ candidate: Double) {
+        let intervals = ((candidate - range.lowerBound) / step).rounded()
+        let nearest = range.lowerBound + intervals * step
+        value = min(range.upperBound, max(range.lowerBound, nearest))
     }
 }
 
@@ -385,18 +399,19 @@ private struct LibraryPreferences: View {
                         Button(role: .destructive) {
                             removing = source
                         } label: {
-                            CenteredControlSymbol(name: "minus.circle", size: CGSize(width: 16, height: 16),
+                            CenteredControlSymbol(name: "minus.circle", size: CGSize(width: 30, height: 30),
                                                   pointSize: 13, weight: .regular)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.borderless)
-                        .liquidGlassHover(in: Circle(), outset: CGSize(width: 4, height: 4))
+                        .liquidGlassHover(in: Circle(), outset: .zero, stableTracking: true)
                         .accessibilityLabel("Remove library folder")
                     }
                 }
                 Button(PreferencesItem.addFolder.title, systemImage: "plus") {
                     state.chooseFiles(folder: true, appendSource: true)
                 }
-                .buttonStyle(GlassHoverButtonStyle())
+                .buttonStyle(GlassHoverButtonStyle.action())
                 .id(PreferencesItem.addFolder)
             }
             Section("Scan Status") {
@@ -428,7 +443,7 @@ private struct LibraryPreferences: View {
                         }
                         Button("Cancel") { library.cancelScan() }
                     }
-                    .buttonStyle(GlassHoverButtonStyle())
+                    .buttonStyle(GlassHoverButtonStyle.action())
                 }
                 if let error = library.scanError {
                     Label(error, systemImage: "exclamationmark.triangle")
@@ -439,7 +454,7 @@ private struct LibraryPreferences: View {
                         .monospacedDigit()
                     Button("Show") { showingIssues = true }
                         .accessibilityLabel("Show unreadable files")
-                        .buttonStyle(GlassHoverButtonStyle())
+                        .buttonStyle(GlassHoverButtonStyle.action())
                         .disabled(library.scanIssues.isEmpty)
                 }
                 .id(PreferencesItem.unreadableFiles)
@@ -453,15 +468,14 @@ private struct LibraryPreferences: View {
                     Button(PreferencesItem.cleanupMissing.title) { Task { await library.cleanupMissingFiles() } }
                         .id(PreferencesItem.cleanupMissing)
                 }
-                .buttonStyle(GlassHoverButtonStyle())
+                .buttonStyle(GlassHoverButtonStyle.action())
                 .disabled(library.sources.isEmpty || library.isScanning)
                 Button(PreferencesItem.clearLibrary.title, role: .destructive) { confirmingClear = true }
-                    .buttonStyle(GlassHoverButtonStyle())
+                    .buttonStyle(GlassHoverButtonStyle.action())
                     .disabled(!library.hasIndexedTracks)
                     .id(PreferencesItem.clearLibrary)
             }
         }
-        .formStyle(.grouped)
         .confirmationDialog("Remove library folder", isPresented: Binding(
             get: { removing != nil },
             set: { if !$0 { removing = nil } }
@@ -492,7 +506,7 @@ private struct LibraryPreferences: View {
                 }
                 Button("Done") { showingIssues = false }
                     .keyboardShortcut(.defaultAction)
-                    .buttonStyle(GlassHoverButtonStyle(prominent: true))
+                    .buttonStyle(GlassHoverButtonStyle.action(prominent: true))
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .padding(20)
@@ -514,12 +528,11 @@ private struct CachePreferences: View {
                 .id(PreferencesItem.coverCache)
                 LabeledContent("Images", value: library.artworkCacheCount.formatted())
                 Button("Clear", role: .destructive) { confirmingClear = true }
-                    .buttonStyle(GlassHoverButtonStyle())
+                    .buttonStyle(GlassHoverButtonStyle.action())
                     .disabled(library.artworkCacheCount == 0)
                     .id(PreferencesItem.clearCache)
             }
         }
-        .formStyle(.grouped)
         .confirmationDialog("Clear cache?", isPresented: $confirmingClear, titleVisibility: .visible) {
             Button("Clear", role: .destructive) { library.clearArtworkCache() }
         }
@@ -532,7 +545,7 @@ private struct LicenseDisclosure: View {
 
     var body: some View {
         Button(PreferencesItem.license.title) { showingLicense = true }
-            .buttonStyle(GlassHoverButtonStyle())
+            .buttonStyle(GlassHoverButtonStyle.action())
             .sheet(isPresented: $showingLicense) {
                 VStack(alignment: .trailing, spacing: 12) {
                     ScrollView {
@@ -543,7 +556,7 @@ private struct LicenseDisclosure: View {
                     }
                     Button("Done") { showingLicense = false }
                         .keyboardShortcut(.defaultAction)
-                        .buttonStyle(GlassHoverButtonStyle(prominent: true))
+                        .buttonStyle(GlassHoverButtonStyle.action(prominent: true))
                 }
                 .padding(20)
                 .frame(minWidth: 560, idealWidth: 650, minHeight: 400, idealHeight: 540)

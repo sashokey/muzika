@@ -8,28 +8,41 @@ struct ArtworkSpectrumBadge: View {
     enum Style {
         case circle
         case songs
+        case audioInfo
     }
 
     let playback: PlaybackController
     let diameter: CGFloat
     var style: Style = .circle
+    var isPresented = true
+    var width: CGFloat?
+    var verticalOutset: CGFloat = 0
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.libraryPlaybackEffectsVisible) private var effectsVisible
     @State private var isVisible = true
-    @State private var levels = Self.idleLevels
+    @State private var levels: [CGFloat]?
 
     private static let idleLevels: [CGFloat] = [0.32, 0.58, 0.83, 0.58, 0.32]
+    private static let audioInfoBandCount = 16
+    private static let minimumSpectrumLevel: CGFloat = 0.23
+    private static let silentLevels = Array(repeating: minimumSpectrumLevel, count: audioInfoBandCount)
+
+    private var restingLevels: [CGFloat] { style == .audioInfo ? Self.silentLevels : Self.idleLevels }
 
     var body: some View {
-        let animates = playback.playing && effectsVisible && isVisible && !reduceMotion && scenePhase != .background
+        let visible = style == .audioInfo ? isPresented : effectsVisible && isVisible
+        let animates = playback.playing && visible && !reduceMotion && scenePhase != .background
         let title: LocalizedStringResource = playback.playing ? "Playing" : "Current Song"
         Group {
-            if style == .songs {
+            switch style {
+            case .songs:
                 bars.shadow(color: .black.opacity(0.9), radius: 1)
-            } else {
+            case .circle:
                 bars.background(.black.opacity(0.82), in: .circle)
+            case .audioInfo:
+                infoBars.accessibilityHidden(true)
             }
         }
         .allowsHitTesting(false)
@@ -40,6 +53,7 @@ struct ArtworkSpectrumBadge: View {
     }
 
     private var bars: some View {
+        let levels = levels ?? restingLevels
         let isSongs = style == .songs
         return HStack(alignment: isSongs ? .bottom : .center, spacing: diameter * (isSongs ? 0.065 : 0.038)) {
             ForEach(levels.indices, id: \.self) { index in
@@ -55,28 +69,54 @@ struct ArtworkSpectrumBadge: View {
         .frame(width: diameter, height: diameter)
     }
 
-    static func bands(from spectrum: [Float]) -> [CGFloat] {
-        guard !spectrum.isEmpty else { return idleLevels }
-        return (0..<5).map { band in
-            let start = spectrum.count * band / 5
-            let end = spectrum.count * (band + 1) / 5
+    private var infoBars: some View {
+        let levels = levels ?? restingLevels
+        let width = width ?? diameter
+        let column = width / CGFloat(levels.count)
+        let peakHeight = diameter + 2 * verticalOutset
+        let restingHeight = diameter * (0.08 + 0.79 * Self.minimumSpectrumLevel)
+        return HStack(spacing: 0) {
+            ForEach(levels.indices, id: \.self) { index in
+                let level = levels[index]
+                let progress = (level - Self.minimumSpectrumLevel) / (1 - Self.minimumSpectrumLevel)
+                Capsule()
+                    .fill(.foreground)
+                    .frame(width: column * (0.22 + 0.56 * level),
+                           height: restingHeight + (peakHeight - restingHeight) * progress)
+                    .frame(width: column, height: peakHeight)
+            }
+        }
+        .frame(width: width, height: diameter)
+        .environment(\.layoutDirection, .leftToRight)
+    }
+
+    static func bands(from spectrum: [Float], count: Int = 5) -> [CGFloat] {
+        guard !spectrum.isEmpty else { return count == 5 ? idleLevels : silentLevels }
+        return (0..<count).map { band in
+            let start = spectrum.count * band / count
+            let end = spectrum.count * (band + 1) / count
             let peak = spectrum[start..<end].reduce(Float.zero) { peak, sample in
                 sample.isFinite ? max(peak, sample) : peak
             }
-            return CGFloat(0.23 + 0.77 * min(1, peak))
+            return minimumSpectrumLevel + (1 - minimumSpectrumLevel) * CGFloat(min(1, peak))
         }
     }
 
     private func updateLevels(animates: Bool) async {
         guard animates else {
-            levels = Self.idleLevels
+            if style == .audioInfo, !reduceMotion {
+                withAnimation(.easeOut(duration: 0.14)) { levels = restingLevels }
+            } else {
+                levels = restingLevels
+            }
             return
         }
         let client = UUID()
         playback.setSpectrumEnabled(true, from: client)
         defer { playback.setSpectrumEnabled(false, from: client) }
         while !Task.isCancelled {
-            let next = Self.bands(from: playback.spectrum())
+            let spectrum = playback.spectrum()
+            let next = spectrum.isEmpty ? restingLevels : Self.bands(from: spectrum, count: restingLevels.count)
             if levels != next {
                 withAnimation(.easeInOut(duration: 0.14)) { levels = next }
             }

@@ -57,7 +57,7 @@ struct LibrarySearchPage: View {
             BrowseHeading(title: LibraryRoute.search.title) {
                 if scope == .lyrics {
                     Button("Refresh lyrics search", systemImage: "arrow.clockwise", action: refreshLyrics)
-                        .buttonStyle(GlassHoverButtonStyle())
+                        .buttonStyle(GlassHoverButtonStyle.action())
                 }
                 if !terms.isEmpty {
                     Picker("Result View", selection: $resultsAsGrid) {
@@ -69,22 +69,10 @@ struct LibrarySearchPage: View {
                     .fixedSize()
                 }
             }
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Search Library", text: $query)
-                    .textFieldStyle(.plain)
-                    .focused($focused)
-                    .onSubmit { rememberQuery() }
-                    .accessibilityLabel("Search Library")
-                if !query.isEmpty {
-                    Button("Clear Search", systemImage: "xmark.circle.fill") { query = "" }
-                        .labelStyle(.iconOnly)
-                        .buttonStyle(.borderless)
-                        .help("Clear Search")
-                }
-            }
-            .padding(8)
-            .liquidGlassHover(restingFill: .quaternary.opacity(0.55))
+            LibrarySearchField(
+                title: "Search Library", clearTitle: "Clear Search", query: $query, focused: $focused,
+                showsClearHelp: true, onSubmit: rememberQuery
+            )
             Picker("Search Scope", selection: $scope) {
                 ForEach(BrowseSearchScope.allCases) { item in
                     Text(item.displayTitle).tag(item)
@@ -159,7 +147,7 @@ struct LibrarySearchPage: View {
                     recentData = Data()
                     recentDestinationsData = Data()
                 }
-                .buttonStyle(GlassHoverButtonStyle())
+                .buttonStyle(GlassHoverButtonStyle.action())
             }
             .padding(.vertical, 9)
 
@@ -490,7 +478,7 @@ struct ListeningBrowser: View {
                         Spacer()
                         Button("Listening Statistics", systemImage: "chevron.right") { navigate(.statistics) }
                             .controlSize(.small)
-                            .buttonStyle(GlassHoverButtonStyle())
+                            .buttonStyle(GlassHoverButtonStyle.action())
                     }
                     BrowseSongGrid(
                         library: library, tracks: recent, playback: playback, displayAlbum: true, limit: 6,
@@ -507,7 +495,7 @@ struct ListeningBrowser: View {
                         Spacer()
                         Button("See All") { navigate(.recentlyAdded) }
                             .controlSize(.small)
-                            .buttonStyle(GlassHoverButtonStyle())
+                            .buttonStyle(GlassHoverButtonStyle.action())
                     }
                     BrowseGroupGrid(groups: Array(latest.prefix(6)), library: library, playback: playback, open: navigate)
                 }
@@ -523,18 +511,18 @@ struct ListeningBrowser: View {
                 )
                 .padding(.vertical, 12)
                 Button("Browse Library", systemImage: "music.note.list") { navigate(.recentlyAdded) }
-                    .buttonStyle(GlassHoverButtonStyle())
+                    .buttonStyle(GlassHoverButtonStyle.action())
                     .frame(maxWidth: .infinity)
             }
             HStack(spacing: 12) {
                 Button("Listening History", systemImage: LibraryRoute.history.symbol) { navigate(.history) }
-                    .buttonStyle(GlassHoverButtonStyle())
+                    .buttonStyle(GlassHoverButtonStyle.action())
                 if recent.isEmpty {
                     Button("Listening Statistics", systemImage: LibraryRoute.statistics.symbol) { navigate(.statistics) }
-                        .buttonStyle(GlassHoverButtonStyle())
+                        .buttonStyle(GlassHoverButtonStyle.action())
                 }
                 Button("Listening Rewind", systemImage: LibraryRoute.rewind.symbol) { navigate(.rewind) }
-                    .buttonStyle(GlassHoverButtonStyle())
+                    .buttonStyle(GlassHoverButtonStyle.action())
                 Spacer()
             }
         }
@@ -559,7 +547,7 @@ struct ListeningBrowser: View {
                     playback.play(last, in: [last])
                 }
             }
-            .buttonStyle(GlassHoverButtonStyle(prominent: true))
+            .buttonStyle(GlassHoverButtonStyle.playback)
         }
         .padding(12)
         .background(.quaternary.opacity(0.7), in: .rect(cornerRadius: 10))
@@ -665,10 +653,9 @@ struct ListeningBrowser: View {
                                     BrowseTrackRow(library: library, track: result.track)
                                 }
                                 .buttonStyle(.plain)
-                                .liquidGlassHover(outset: BrowseTrackRow.hoverOutset)
                                 .modifier(ArtworkPlaybackModifier(
                                     library: library, target: .track(result.track, queue: rankedTracks),
-                                    playback: playback, compact: true
+                                    playback: playback, layout: .row, cardHoverOutset: BrowseTrackRow.hoverOutset
                                 ))
                                 Text("Plays: \(result.count)")
                                     .frame(minWidth: 60, alignment: .trailing)

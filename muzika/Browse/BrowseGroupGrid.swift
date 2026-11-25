@@ -1,9 +1,16 @@
 import AppKit
+import QuartzCore
 import SwiftUI
 
 enum BrowseGroupPresentation {
     case grid
     case list
+
+    @MainActor var hoverOutset: CGSize {
+        self == .list ? BrowseTrackRow.hoverOutset : BrowseArtwork.cardHoverOutset
+    }
+
+    var dividerHeight: CGFloat { self == .list ? 1 : 0 }
 }
 
 @MainActor
@@ -21,14 +28,17 @@ struct BrowseGroupGrid: View {
     @Environment(\.controlSize) private var controlSize
     @Environment(\.layoutDirection) private var layoutDirection
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.libraryPlaybackEffectsVisible) private var playbackEffectsVisible
 
     var body: some View {
         GroupGridSurface(
             groups: groups, library: library, playback: playback, open: open, circular: circular, presentation: presentation,
-            labelHeight: labelHeight, appearance: GroupGridAppearance(
+            labelHeight: labelHeight,
+            appearance: GroupGridAppearance(
                 displayScale: displayScale, dynamicTypeSize: dynamicTypeSize, controlSize: controlSize,
-                layoutDirection: layoutDirection, colorScheme: colorScheme, playbackEffectsVisible: playbackEffectsVisible
+                layoutDirection: layoutDirection, colorScheme: colorScheme, reduceMotion: reduceMotion,
+                playbackEffectsVisible: playbackEffectsVisible
             )
         )
         .background(alignment: .topLeading) {
@@ -53,6 +63,7 @@ private struct GroupGridAppearance: Equatable {
     let controlSize: ControlSize
     let layoutDirection: LayoutDirection
     let colorScheme: ColorScheme
+    let reduceMotion: Bool
     let playbackEffectsVisible: Bool
 }
 
@@ -83,7 +94,8 @@ private struct GroupGridCard: View {
     let presentation: BrowseGroupPresentation
     let appearance: GroupGridAppearance
     let open: (LibraryRoute) -> Void
-    var pointerOnArtwork: Bool?
+    var nativeCardHeight: CGFloat?
+    var nativeButtonHovered: Bool?
 
     var body: some View {
         if let group {
@@ -97,20 +109,20 @@ private struct GroupGridCard: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .liquidGlassHover(outset: isList ? BrowseTrackRow.hoverOutset : BrowseArtwork.cardHoverOutset,
-                                  hovered: pointerOnArtwork.map { _ in true })
                 .accessibilityLabel(group.title)
                 .accessibilityHint(group.subtitle)
                 .modifier(ArtworkPlaybackModifier(
-                    library: library, target: .group(group.tracks), playback: playback, compact: isList,
-                    artworkHovered: pointerOnArtwork
+                    library: library, target: .group(group.tracks), playback: playback, layout: isList ? .row : .grid,
+                    cardHoverOutset: nativeCardHeight == nil ? presentation.hoverOutset : nil,
+                    hoverOverride: nativeCardHeight.map { _ in true },
+                    buttonHoverOverride: nativeButtonHovered
                 ))
                 .contextMenu {
                     Button("Open", systemImage: "arrow.right") { open(group.route) }
                     Divider()
                     PlayTracksMenu(tracks: group.tracks, playback: playback)
                 }
-                if isList {
+                if isList && nativeCardHeight == nil {
                     Divider().padding(.leading, 46)
                 }
             }
@@ -120,13 +132,15 @@ private struct GroupGridCard: View {
             .environment(\.layoutDirection, appearance.layoutDirection)
             .environment(\.colorScheme, appearance.colorScheme)
             .environment(\.libraryPlaybackEffectsVisible, appearance.playbackEffectsVisible)
-            .accessibilityHidden(pointerOnArtwork != nil)
+            .accessibilityHidden(nativeCardHeight != nil)
         }
     }
 
     @ViewBuilder
     private func cardContent(_ group: BrowseGroup) -> some View {
-        if presentation == .list {
+        if let nativeCardHeight {
+            Color.clear.frame(width: width, height: nativeCardHeight - presentation.dividerHeight)
+        } else if presentation == .list {
             HStack(spacing: 10) {
                 BrowseArtwork(library: library, track: group.artworkTrack, symbol: group.route.symbol,
                               pixelSize: 96, circular: circular)
@@ -145,6 +159,47 @@ private struct GroupGridCard: View {
                 GroupGridLabel(title: group.title, subtitle: group.subtitle)
             }
         }
+    }
+}
+
+private struct GroupGridHoverBackdrop: View {
+    let outset: CGSize
+
+    var body: some View {
+        Color.clear
+            .liquidGlassHover(outset: outset, hovered: true)
+            .padding(.horizontal, outset.width)
+            .padding(.vertical, outset.height)
+    }
+}
+
+private final class GroupGridHoverBackdropHost: NSHostingView<GroupGridHoverBackdrop> {
+    private static let opacityKey = "group-hover-opacity"
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    @discardableResult
+    func setHighlighted(_ highlighted: Bool, animated: Bool, startsHidden: Bool = false) -> TimeInterval {
+        wantsLayer = true
+        guard let layer else { return 0 }
+        let target: Float = highlighted ? 1 : 0
+        let active = layer.animation(forKey: Self.opacityKey) as? CABasicAnimation
+        let start = startsHidden ? 0 : layer.presentation()?.opacity ?? (active?.fromValue as? NSNumber)?.floatValue ?? layer.opacity
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+        layer.opacity = target
+        layer.removeAnimation(forKey: Self.opacityKey)
+        guard animated, start != target else { return 0 }
+
+        let animation = CASpringAnimation(perceptualDuration: GlassHoverMotion.duration, bounce: 0)
+        animation.keyPath = "opacity"
+        animation.fromValue = start
+        animation.toValue = target
+        animation.duration = animation.settlingDuration
+        layer.add(animation, forKey: Self.opacityKey)
+        return animation.duration
     }
 }
 
@@ -168,7 +223,7 @@ private struct GroupGridLayout: Equatable {
         if presentation == .list {
             columns = 1
             itemWidth = width
-            rowHeight = max(36, labelHeight) + BrowseGroupList.rowVerticalPadding * 2 + 1
+            rowHeight = max(36, labelHeight) + BrowseGroupList.rowVerticalPadding * 2 + presentation.dividerHeight
         } else {
             columns = max(1, Int((width + Self.columnSpacing) / (Self.minimumWidth + Self.columnSpacing)))
             itemWidth = min(Self.maximumWidth, max(0, (width - CGFloat(columns - 1) * Self.columnSpacing) / CGFloat(columns)))
@@ -232,12 +287,18 @@ private struct GroupGridSurface: NSViewRepresentable {
         private var nativeCards = false
         private var tracking: NSTrackingArea?
         private var interaction: CardHost?
+        private var hoverBackdrop: GroupGridHoverBackdropHost?
+        private var fadingBackdrop: GroupGridHoverBackdropHost?
+        private var fadeRemoval: Task<Void, Never>?
         private var interactionIndex: Int?
-        private var pointerOnArtwork: Bool?
+        private var interactionButtonHovered: Bool?
 
         override var isFlipped: Bool { true }
 
-        isolated deinit { NotificationCenter.default.removeObserver(self) }
+        isolated deinit {
+            fadeRemoval?.cancel()
+            NotificationCenter.default.removeObserver(self)
+        }
 
         func configure(_ next: GroupGridSurface) {
             let previous = configuration
@@ -394,11 +455,12 @@ private struct GroupGridSurface: NSViewRepresentable {
         }
 
         private func card(_ configuration: GroupGridSurface, index: Int?, width: CGFloat,
-                          pointerOnArtwork: Bool? = nil) -> GroupGridCard {
+                          nativeCardHeight: CGFloat? = nil, nativeButtonHovered: Bool? = nil) -> GroupGridCard {
             GroupGridCard(group: index.map { configuration.groups[$0] }, library: configuration.library,
                           playback: configuration.playback, width: width, circular: configuration.circular,
                           presentation: configuration.presentation, appearance: configuration.appearance,
-                          open: { [weak self] route in self?.configuration?.open(route) }, pointerOnArtwork: pointerOnArtwork)
+                          open: { [weak self] route in self?.configuration?.open(route) },
+                          nativeCardHeight: nativeCardHeight, nativeButtonHovered: nativeButtonHovered)
         }
 
         private func updateInteraction(at location: NSPoint? = nil) {
@@ -413,18 +475,24 @@ private struct GroupGridSurface: NSViewRepresentable {
                 return
             }
             let frame = view.frame
-            let artwork = configuration.presentation == .list
-                ? CGRect(x: frame.minX, y: frame.minY + BrowseGroupList.rowVerticalPadding, width: 36, height: 36)
-                : CGRect(x: frame.minX, y: frame.minY, width: frame.width, height: frame.width)
-            let artworkHovered = artwork.contains(point)
-            guard interactionIndex != index || artworkHovered != pointerOnArtwork else { return }
-            let root = card(configuration, index: index, width: frame.width, pointerOnArtwork: artworkHovered)
+            let buttonHovered: Bool?
+            if configuration.presentation == .list, let size = ArtworkPlaybackLayout.row.artworkSize {
+                let artwork = CGRect(x: frame.minX, y: frame.minY + BrowseGroupList.rowVerticalPadding,
+                                     width: size, height: size)
+                buttonHovered = ArtworkPlaybackLayout.row.buttonFrame(in: artwork).contains(point)
+            } else {
+                buttonHovered = nil
+            }
+            guard interactionIndex != index || interactionButtonHovered != buttonHovered else { return }
+            let root = card(configuration, index: index, width: frame.width, nativeCardHeight: frame.height,
+                            nativeButtonHovered: buttonHovered)
             if interactionIndex != index {
                 clearInteraction()
                 interactionIndex = index
-                view.alphaValue = 0
+                placeHoverBackdrop(behind: view, presentation: configuration.presentation,
+                                   animated: !configuration.appearance.reduceMotion)
             }
-            pointerOnArtwork = artworkHovered
+            interactionButtonHovered = buttonHovered
             if let interaction {
                 interaction.rootView = root
                 interaction.frame = frame
@@ -438,11 +506,49 @@ private struct GroupGridSurface: NSViewRepresentable {
             }
         }
 
+        private func placeHoverBackdrop(behind card: NSView, presentation: BrowseGroupPresentation, animated: Bool) {
+            let outset = presentation.hoverOutset
+            var content = card.frame
+            content.size.height -= presentation.dividerHeight
+            let frame = content.insetBy(dx: -outset.width, dy: -outset.height)
+            if let fadingBackdrop, fadingBackdrop.superview === self, fadingBackdrop.frame == frame {
+                fadeRemoval?.cancel()
+                self.fadingBackdrop = hoverBackdrop
+                hoverBackdrop = fadingBackdrop
+                fadingBackdrop.setHighlighted(true, animated: animated)
+                return
+            }
+            let backdrop = GroupGridHoverBackdrop(outset: outset)
+            let host = hoverBackdrop ?? GroupGridHoverBackdropHost(rootView: backdrop)
+            if host.rootView.outset != outset { host.rootView = backdrop }
+            host.sizingOptions = []
+            host.frame = frame
+            addSubview(host, positioned: .below, relativeTo: card)
+            host.setHighlighted(true, animated: animated, startsHidden: true)
+            hoverBackdrop = host
+        }
+
         private func clearInteraction() {
-            guard let interactionIndex else { return }
-            cards[interactionIndex]?.alphaValue = 1
-            self.interactionIndex = nil
-            pointerOnArtwork = nil
+            guard interactionIndex != nil else { return }
+            fadeRemoval?.cancel()
+            let spare = fadingBackdrop
+            spare?.removeFromSuperview()
+            fadingBackdrop = hoverBackdrop
+            hoverBackdrop = spare
+            if let fadingBackdrop {
+                let duration = fadingBackdrop.setHighlighted(false, animated: configuration?.appearance.reduceMotion == false)
+                if duration == 0 {
+                    fadingBackdrop.removeFromSuperview()
+                } else {
+                    fadeRemoval = Task { @MainActor [weak fadingBackdrop] in
+                        do { try await Task.sleep(for: .seconds(duration)) }
+                        catch { return }
+                        fadingBackdrop?.removeFromSuperview()
+                    }
+                }
+            }
+            interactionIndex = nil
+            interactionButtonHovered = nil
             if let interaction, let configuration {
                 interaction.isHidden = true
                 interaction.rootView = card(configuration, index: nil, width: 0)

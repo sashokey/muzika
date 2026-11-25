@@ -10,7 +10,11 @@ struct LyricsPanel: View {
     let seek: @MainActor (Double) -> Void
     var topOverflow: CGFloat = 0
     var positionSnapshot: (@MainActor () -> Double)? = nil
+    var duration: Double?
+    var bottomClearance: CGFloat = 0
+    var isWindowVisible = true
 
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorSchemeContrast) private var contrast
 
@@ -21,13 +25,13 @@ struct LyricsPanel: View {
                 pausedPosition: playing ? nil : (positionSnapshot?() ?? position()),
                 playing: playing, offset: offset, textSize: textSize,
                 blur: blur && !reduceMotion && contrast != .increased,
-                reduceMotion: reduceMotion, topOverflow: topOverflow, seek: seek
+                reduceMotion: reduceMotion, topOverflow: topOverflow, seek: seek, duration: duration
             ))
         } else {
             GeometryReader { geometry in
                 let typography = LyricsTypography(width: geometry.size.width, scale: textSize)
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: typography.spacing) {
+                    VStack(alignment: .leading, spacing: typography.spacing) {
                         ForEach(document.lines) { line in
                             VStack(alignment: .leading, spacing: typography.auxiliarySpacing) {
                                 if let pronunciation = line.pronunciation {
@@ -53,6 +57,16 @@ struct LyricsPanel: View {
                     .padding(.horizontal, typography.horizontalInset)
                     .frame(maxWidth: typography.containerWidth)
                     .frame(maxWidth: .infinity)
+                    .padding(.bottom, bottomClearance)
+                    .background {
+                        UntimedLyricsScrollDriver(
+                            position: position, positionSnapshot: positionSnapshot?() ?? position(),
+                            duration: duration, playing: playing, visible: isWindowVisible && scenePhase != .background,
+                            reduceMotion: reduceMotion
+                        )
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                    }
                 }
                 .scrollIndicators(.never, axes: .vertical)
                 .scrollClipDisabled(topOverflow > 0)

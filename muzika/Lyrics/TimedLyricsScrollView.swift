@@ -12,6 +12,7 @@ struct TimedLyricsConfiguration {
     let reduceMotion: Bool
     let topOverflow: CGFloat
     let seek: @MainActor (Double) -> Void
+    var duration: Double? = nil
 }
 
 @MainActor
@@ -127,7 +128,7 @@ final class TimedLyricsScrollView: NSScrollView {
         if clipsToBounds != clips { clipsToBounds = clips }
         if contentView.clipsToBounds != clips { contentView.clipsToBounds = clips }
         updateLayout()
-        updateCue(force: old?.offset != next.offset || old?.reduceMotion != next.reduceMotion)
+        updateCue(force: old?.offset != next.offset || old?.reduceMotion != next.reduceMotion || old?.duration != next.duration)
         if next.reduceMotion, motion != nil {
             center(animated: false)
         }
@@ -342,6 +343,7 @@ final class TimedLyricsScrollView: NSScrollView {
         let next = configuration.document.displayTime(at: now)
         if next == time && !force {
             if activeGap != nil { updateCountdown(at: now) }
+            fillingRow?.paintLineFill(at: now)
             if refreshAccents {
                 CATransaction.begin()
                 CATransaction.setDisableActions(true)
@@ -445,13 +447,18 @@ final class TimedLyricsScrollView: NSScrollView {
         let singing = isSinging(line)
         let dimmed = focus != .row(index) && !singing
         let hasWords = !line.words.isEmpty || !line.pronunciationWords.isEmpty || !line.translationWords.isEmpty
+        let fillInterval = singing && focus == .row(index) && !configuration.reduceMotion && line.words.isEmpty
+            ? configuration.document.fillInterval(for: line, until: configuration.duration.map { $0 - configuration.offset })
+            : nil
         row.update(LyricsRowLayer.Appearance(singing: singing, dimmed: dimmed, idleOpacity: idleOpacity(for: index),
                                              hovered: hover == index,
                                              softened: dimmed && configuration.blur,
-                                             wordTime: singing && hasWords ? time : -.infinity), animated: animated)
+                                             wordTime: singing && hasWords ? time : -.infinity,
+                                             fillInterval: fillInterval), animated: animated)
         if singing, hasWords {
             row.paintAccents(at: accentPosition ?? time, motion: accentMotion, reposition: repositionAccents)
         }
+        row.paintLineFill(at: accentPosition ?? time)
     }
 
     private func idleOpacity(for index: Int) -> Float {
@@ -599,8 +606,13 @@ final class TimedLyricsScrollView: NSScrollView {
 
     private func holdFollowing() {
         stopMotion(keepingPosition: true)
-        manualUntil = CACurrentMediaTime() + 4
+        manualUntil = CACurrentMediaTime() + LyricsScrollTiming.manualHold
         updateClocks()
+    }
+
+    private var fillingRow: LyricsRowLayer? {
+        guard case .row(let index) = focus, let row = rowLayers[index], row.hasLineFill else { return nil }
+        return row
     }
 
     private func updateClocks() {
@@ -614,9 +626,10 @@ final class TimedLyricsScrollView: NSScrollView {
             ticker?.invalidate()
             ticker = nil
         }
-        let wantsDisplayLink = attached && activeGap != nil && configuration?.playing == true && configuration?.reduceMotion == false
+        let wantsDisplayLink = attached && (activeGap != nil || fillingRow != nil) &&
+            configuration?.playing == true && configuration?.reduceMotion == false
         if wantsDisplayLink, displayLink == nil {
-            let link = displayLink(target: self, selector: #selector(updateInstrumentalProgress))
+            let link = displayLink(target: self, selector: #selector(updatePlaybackProgress))
             displayLink = link
             link.add(to: .main, forMode: .common)
         } else if !wantsDisplayLink {
@@ -634,10 +647,12 @@ final class TimedLyricsScrollView: NSScrollView {
         updateClocks()
     }
 
-    @objc private func updateInstrumentalProgress() {
-        if let gap = activeGap, configuration?.reduceMotion == false {
-            countdown.setProgress((audioTime - gap.start) / (gap.end - gap.start))
+    @objc private func updatePlaybackProgress() {
+        let now = audioTime
+        if let gap = activeGap {
+            countdown.setProgress((now - gap.start) / (gap.end - gap.start))
         }
+        fillingRow?.paintLineFill(at: now)
     }
 
     fileprivate func row(at point: CGPoint) -> Int? {

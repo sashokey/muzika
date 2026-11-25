@@ -74,6 +74,7 @@ struct PlayerVolumeButton: View {
 
 struct PlayerIcon: View {
     static let size = CGSize(width: 27, height: 28)
+    static let glyphSize: CGFloat = 15
 
     let title: LocalizedStringResource
     let symbol: String
@@ -96,7 +97,7 @@ struct PlayerIcon: View {
 
     var body: some View {
         Button(action: action) {
-            CenteredControlSymbol(name: symbol, size: Self.size, symbolScale: symbolScale)
+            CenteredControlSymbol(name: symbol, size: Self.size, symbolScale: symbolScale, pointSize: Self.glyphSize)
                 .foregroundStyle(highlighted ? Color.accentColor : Color.primary)
                 .contentShape(Rectangle().scale(x: symbolScale, y: symbolScale))
         }
@@ -152,11 +153,36 @@ struct Scrubber: View {
     var playback: PlaybackController
     let duration: Double
     @Binding var editingTime: Double?
+    var followsPlaybackClock = false
+    var isVisible = true
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.controlSize) private var controlSize
 
     var body: some View {
+        if followsPlaybackClock {
+            SmoothSeekSlider(
+                duration: duration, snapshot: playback.position, entryID: playback.currentEntryID,
+                playing: playback.playing, isVisible: isVisible && scenePhase != .background,
+                reduceMotion: reduceMotion, controlSize: controlSize,
+                isRendering: { playback.isRendering }, livePosition: { playback.livePosition },
+                preview: { editingTime = $0 }, seek: { value in
+                    playback.seek(to: value)
+                    editingTime = nil
+                }
+            )
+            .frame(height: controlSize == .large || controlSize == .extraLarge ? 20 : 16)
+            .accessibilityValue(elapsedLabel(editingTime ?? playback.position))
+        } else {
+            slider(position: playback.position)
+        }
+    }
+
+    private func slider(position: Double) -> some View {
         Slider(
             value: Binding(
-                get: { min(max(editingTime ?? playback.position, 0), max(0.01, duration)) },
+                get: { min(max(editingTime ?? position, 0), max(0.01, duration)) },
                 set: { editingTime = $0 }
             ),
             in: 0...max(0.01, duration)

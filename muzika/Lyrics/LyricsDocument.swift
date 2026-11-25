@@ -128,6 +128,15 @@ nonisolated struct LyricsDocument: Sendable, Equatable {
         return background
     }
 
+    func fillInterval(for line: LyricsLine, until trackEnd: Double?) -> Range<Double>? {
+        guard let start = line.start, start.isFinite else { return nil }
+        let next = insertionIndex(at: start)
+        let nextStart = timedIndices.indices.contains(next) ? lines[timedIndices[next]].start : nil
+        let end = [line.end, nextStart, trackEnd].compactMap { $0 }
+            .filter { $0.isFinite && $0 > start }.min()
+        return end.map { start..<$0 }
+    }
+
     func gap(before id: Int) -> LyricsGap? { gaps[id] }
 
     func gap(at seconds: Double) -> LyricsGap? {

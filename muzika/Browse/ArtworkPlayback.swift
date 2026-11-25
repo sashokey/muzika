@@ -23,31 +23,98 @@ enum ArtworkPlaybackTarget {
     }
 }
 
+enum ArtworkPlaybackLayout {
+    case grid
+    case row
+    case song
+
+    static let songArtworkSize: CGFloat = 22
+    static let songArtworkGap: CGFloat = 7
+
+    var artworkSize: CGFloat? {
+        switch self {
+        case .grid: nil
+        case .row: 36
+        case .song: Self.songArtworkSize
+        }
+    }
+
+    var buttonSize: CGFloat {
+        switch self {
+        case .grid: 34
+        case .row: 28
+        case .song: Self.songArtworkSize
+        }
+    }
+
+    var hitWidth: CGFloat { buttonSize + (self == .song ? Self.songArtworkGap : 0) }
+    var artworkWidth: CGFloat? { self == .song ? hitWidth : artworkSize }
+
+    var symbolSize: CGFloat {
+        switch self {
+        case .grid: 14
+        case .row: 12
+        case .song: 10
+        }
+    }
+
+    func buttonFrame(in artwork: CGRect) -> CGRect {
+        CGRect(x: artwork.midX - buttonSize / 2, y: artwork.midY - buttonSize / 2,
+               width: buttonSize, height: buttonSize)
+    }
+}
+
 @MainActor
 struct ArtworkPlaybackModifier: ViewModifier {
     let library: LibraryStore
     let target: ArtworkPlaybackTarget
     let playback: PlaybackController
-    let compact: Bool
+    let layout: ArtworkPlaybackLayout
     var effectsTrack: AudioTrack? = nil
     var beforePlay: (AudioTrack) -> Void = { _ in }
-    var artworkHovered: Bool?
+    let cardHoverOutset: CGSize?
+    var hoverOverride: Bool?
+    var buttonHoverOverride: Bool?
+
+    @State private var cardHovered = false
 
     @Environment(\.libraryPlaybackEffectsVisible) private var effectsVisible
 
+    @ViewBuilder
     func body(content: Content) -> some View {
+        let hovered = hoverOverride ?? cardHovered
+        let card = playbackOverlay(for: cardSurface(for: content, hovered: hovered), hovered: hovered)
+        if hoverOverride == nil, cardHoverOutset != nil {
+            card.stableHover { cardHovered = $0 }
+        } else {
+            card
+        }
+    }
+
+    @ViewBuilder
+    private func cardSurface(for content: Content, hovered: Bool) -> some View {
+        if let cardHoverOutset {
+            content.liquidGlassHover(outset: cardHoverOutset, hovered: hovered)
+        } else {
+            content
+        }
+    }
+
+    @ViewBuilder
+    private func playbackOverlay(for content: some View, hovered: Bool) -> some View {
         if effectsVisible {
             let isCurrent = target.contains(playback.current)
             let state = HomeArtworkPlaybackState(isCurrent: isCurrent, isPlaying: isCurrent && playback.playing)
             let title: LocalizedStringResource = state.showsPlaying ? "Pause" : "Play"
             content
-                .overlay(alignment: compact ? .leading : .top) {
+                .overlay(alignment: layout == .grid ? .top : .leading) {
                     let artwork = ArtworkPlaybackControl(
                         library: library, effectsTrack: effectsTrack, playback: playback, state: state,
-                        title: title, compact: compact, hoverOverride: artworkHovered, action: playOrPause
+                        title: title, layout: layout,
+                        hoverOverride: layout == .grid ? hovered : buttonHoverOverride, action: playOrPause
                     )
-                    if compact {
-                        artwork.frame(width: 36, height: 36)
+                    if let width = layout.artworkWidth, let height = layout.artworkSize {
+                        artwork.frame(width: width, height: height)
                     } else {
                         artwork
                             .aspectRatio(1, contentMode: .fit)
@@ -82,19 +149,18 @@ private struct ArtworkPlaybackControl: View {
     let playback: PlaybackController
     let state: HomeArtworkPlaybackState
     let title: LocalizedStringResource
-    let compact: Bool
+    let layout: ArtworkPlaybackLayout
     let hoverOverride: Bool?
     let action: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isHovered = false
+    @State private var buttonHovered = false
     @State private var visible = false
     @State private var palette = WavePalette.defaultPalette
     @FocusState private var focused: Bool
 
     var body: some View {
-        let showsControl = (hoverOverride ?? isHovered) || focused
-        let buttonSize: CGFloat = compact ? 28 : 34
+        let showsControl = (hoverOverride ?? buttonHovered) || focused
         ZStack(alignment: .center) {
             Color.clear.allowsHitTesting(false)
             if let track = effectsTrack, state.isCurrent, visible, !reduceMotion {
@@ -114,33 +180,53 @@ private struct ArtworkPlaybackControl: View {
                         }
                     }
             }
-            if effectsTrack != nil, state.showsPlaying, !showsControl {
-                ArtworkSpectrumBadge(playback: playback, diameter: compact ? 16 : 22)
-                    .padding(compact ? 2 : 6)
+            if layout == .song, state.isCurrent, !showsControl {
+                ArtworkSpectrumBadge(playback: playback, diameter: layout.buttonSize, style: .songs)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else if effectsTrack != nil, state.showsPlaying, !showsControl {
+                ArtworkSpectrumBadge(playback: playback, diameter: layout == .row ? 16 : 22)
+                    .padding(layout == .row ? 2 : 6)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             }
-            Button(action: action) {
-                Group {
-                    if showsControl {
-                        CenteredControlSymbol(name: state.symbol, size: CGSize(width: buttonSize, height: buttonSize),
-                                              pointSize: compact ? 12 : 14)
-                    } else {
-                        Color.clear.frame(width: buttonSize, height: buttonSize)
-                    }
-                }
-                .contentShape(Circle())
-                .glassEffect(showsControl ? .regular.interactive() : .identity, in: Circle())
-            }
-            .buttonStyle(.plain)
-            .focused($focused)
-            .accessibilityLabel(Text(title))
-            .opacity(showsControl ? 1 : 0)
-            .scaleEffect(reduceMotion || showsControl ? 1 : GlassHoverMotion.initialScale)
-            .allowsHitTesting(showsControl)
-            .accessibilityHidden(!showsControl)
+            playbackButton(showsControl: showsControl)
         }
-        .onHover { isHovered = $0 }
         .onScrollVisibilityChange(threshold: 0.2) { visible = $0 }
         .animation(reduceMotion ? nil : GlassHoverMotion.appearance, value: showsControl)
     }
+
+    @ViewBuilder
+    private func playbackButton(showsControl: Bool) -> some View {
+        let size = layout.buttonSize
+        let button = Button(action: action) {
+            let surface = Group {
+                if showsControl {
+                    CenteredControlSymbol(name: state.symbol, size: CGSize(width: size, height: size),
+                                          pointSize: layout.symbolSize)
+                } else {
+                    Color.clear.frame(width: size, height: size)
+                }
+            }
+            .glassEffect(showsControl ? .regular.interactive() : .identity, in: Circle())
+            .scaleEffect(reduceMotion || showsControl ? 1 : GlassHoverMotion.initialScale)
+            if layout == .grid {
+                surface.contentShape(Circle())
+            } else {
+                surface
+                    .frame(width: layout.hitWidth, height: size, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+        }
+        .buttonStyle(.plain)
+        .focused($focused)
+        .accessibilityLabel(Text(title))
+        .opacity(showsControl ? 1 : 0)
+        .allowsHitTesting(showsControl)
+        .accessibilityHidden(!showsControl)
+        if hoverOverride == nil {
+            button.stableHover { buttonHovered = $0 }
+        } else {
+            button
+        }
+    }
+
 }

@@ -63,19 +63,12 @@ struct FolderBrowserPage: View {
                     if folder != nil, !descendants.isEmpty {
                         BrowsePlaybackButtons(tracks: descendants, playback: playback)
                     }
-                    if folder != nil {
-                        BrowseTrackSortMenu(sort: $trackSort.key, descending: $trackSort.descending)
-                        BrowseTrackFiltersMenu(filters: $filters, tracks: descendants)
-                    }
-                    if !folders.isEmpty {
-                        Menu("Folder Order", systemImage: "folder") {
-                            Toggle("Ascending by Name", isOn: $sortByName)
-                        }
-                        .glassHoverMenu()
+                    if folder != nil || !folders.isEmpty {
+                        BrowseHeaderMenus(menus: headerMenus(tracks: descendants, includesTrackMenus: folder != nil, hasFolders: !folders.isEmpty))
                     }
                     if folder == nil {
                         Button("Add Folder", systemImage: "folder.badge.plus", action: addFolder)
-                            .buttonStyle(GlassHoverButtonStyle())
+                            .buttonStyle(GlassHoverButtonStyle.action())
                             .disabled(library.isScanning)
                     }
                 }
@@ -93,6 +86,18 @@ struct FolderBrowserPage: View {
             .padding(.horizontal, 26)
         }
         .windowLibraryFilter(text: $query, prompt: "Filter Folders")
+    }
+
+    private func headerMenus(tracks: [AudioTrack], includesTrackMenus: Bool, hasFolders: Bool) -> [BrowseHeaderMenu] {
+        var menus: [BrowseHeaderMenu] = includesTrackMenus ? [
+            .trackSort($trackSort), .trackFilters($filters, tracks: tracks)
+        ] : []
+        if hasFolders {
+            menus.append(BrowseHeaderMenu(id: .folderOrder, title: "Folder Order", symbol: "folder", entries: [
+                .command(Text("Ascending by Name"), selected: sortByName) { sortByName.toggle() }
+            ]))
+        }
+        return menus
     }
 
     private func folderList(_ folders: [Folder]) -> some View {

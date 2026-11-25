@@ -1,5 +1,9 @@
 import CoreGraphics
 
+nonisolated enum LyricsScrollTiming {
+    static let manualHold: Double = 4
+}
+
 struct LyricsScrollGeometry {
     let anchor: CGFloat
     let gapExtent: CGFloat

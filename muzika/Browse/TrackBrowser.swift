@@ -18,6 +18,8 @@ struct TrackBrowserPage: View {
     let navigate: ((LibraryRoute) -> Void)?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.controlSize) private var controlSize
     @State private var query = ""
     @State private var sort: TrackSortOrder
     @State private var filters = OfflineTrackFilters()
@@ -95,8 +97,7 @@ struct TrackBrowserPage: View {
         VStack(alignment: .leading, spacing: 12) {
             BrowseHeading(title: title, subtitle: subtitle ?? trackCount(tracks.count), back: back) {
                 if !onlyAlbums {
-                    BrowseTrackSortMenu(sort: $sort.key, descending: $sort.descending)
-                    BrowseTrackFiltersMenu(filters: $filters, tracks: tracks)
+                    BrowseHeaderMenus(menus: [.trackSort($sort), .trackFilters($filters, tracks: tracks)])
                 }
             }
             if !relatedAlbums.isEmpty {
@@ -155,6 +156,11 @@ struct TrackBrowserPage: View {
                 library: library, tracks: selectedTracks, playback: playback, sorting: $sort,
                 highlightsCellsOnHover: highlightsCellsOnHover, usesSongsArtwork: usesSongsArtwork, navigate: navigate
             )
+            .transformEnvironment(\.defaultMinListRowHeight) { height in
+                if usesUniformRows && dynamicTypeSize == .large && controlSize == .regular {
+                    height = max(height, 30)
+                }
+            }
             .trackTableScrollEdge(enabled: glassHeader, usesUniformRows: usesUniformRows)
         }
     }
