@@ -47,6 +47,7 @@
 "Bit Depth" = "Độ sâu bit";
 "Bitrate" = "Tốc độ bit";
 "Browse Library" = "Duyệt thư viện";
+"Browsing" = "Duyệt thư viện";
 "Bundle Version" = "Phiên bản gói";
 "Cached Data" = "Dữ liệu bộ nhớ đệm";
 "Cancel" = "Hủy";
@@ -82,7 +83,6 @@
 "Default view" = "Chế độ xem mặc định";
 "Disc" = "Đĩa";
 "Dismiss" = "Đóng";
-"Display" = "Hiển thị";
 "Done" = "Xong";
 "Duration" = "Thời lượng";
 "Effects" = "Hiệu ứng";
@@ -140,7 +140,6 @@
 "Listening Rewind" = "Nhìn lại hành trình nghe nhạc";
 "Listening Statistics" = "Thống kê nghe nhạc";
 "Listening Time" = "Thời gian nghe";
-"Listening statistics" = "Thống kê nghe nhạc";
 "Loading lyrics…" = "Đang tải lời bài hát…";
 "Local Library" = "Thư viện cục bộ";
 "Lock Queue" = "Khóa hàng đợi";
@@ -245,6 +244,7 @@
 "Scan Status" = "Trạng thái quét";
 "Scanning Library…" = "Đang quét thư viện…";
 "Scanning…" = "Đang quét…";
+"Scrolling" = "Cuộn";
 "Search" = "Tìm kiếm";
 "Search Library" = "Tìm trong thư viện";
 "Search Scope" = "Phạm vi tìm kiếm";
@@ -303,7 +303,6 @@
 "Version" = "Phiên bản";
 "View" = "Xem";
 "Volume" = "Âm lượng";
-"Volume and transitions" = "Âm lượng và chuyển tiếp";
 "Weekly" = "Hằng tuần";
 "Year" = "Năm";
 "Your Year in Music" = "Một năm nghe nhạc của bạn";

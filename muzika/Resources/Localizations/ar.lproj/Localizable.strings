@@ -47,6 +47,7 @@
 "Bit Depth" = "عمق البت";
 "Bitrate" = "معدل البت";
 "Browse Library" = "تصفح المكتبة";
+"Browsing" = "التصفح";
 "Bundle Version" = "إصدار الحزمة";
 "Cached Data" = "البيانات المخزنة مؤقتًا";
 "Cancel" = "إلغاء";
@@ -82,7 +83,6 @@
 "Default view" = "العرض الافتراضي";
 "Disc" = "القرص";
 "Dismiss" = "إغلاق";
-"Display" = "العرض";
 "Done" = "تم";
 "Duration" = "المدة";
 "Effects" = "التأثيرات";
@@ -140,7 +140,6 @@
 "Listening Rewind" = "ملخص الاستماع";
 "Listening Statistics" = "إحصاءات الاستماع";
 "Listening Time" = "مدة الاستماع";
-"Listening statistics" = "إحصاءات الاستماع";
 "Loading lyrics…" = "يجري تحميل كلمات الأغنية…";
 "Local Library" = "المكتبة المحلية";
 "Lock Queue" = "قفل قائمة الانتظار";
@@ -245,6 +244,7 @@
 "Scan Status" = "حالة الفحص";
 "Scanning Library…" = "يجري فحص المكتبة…";
 "Scanning…" = "يجري الفحص…";
+"Scrolling" = "التمرير";
 "Search" = "بحث";
 "Search Library" = "البحث في المكتبة";
 "Search Scope" = "نطاق البحث";
@@ -303,7 +303,6 @@
 "Version" = "الإصدار";
 "View" = "عرض";
 "Volume" = "مستوى الصوت";
-"Volume and transitions" = "مستوى الصوت والانتقالات";
 "Weekly" = "أسبوعيًا";
 "Year" = "السنة";
 "Your Year in Music" = "عامك في الموسيقى";

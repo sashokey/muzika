@@ -47,6 +47,7 @@
 "Bit Depth" = "Kedalaman Bit";
 "Bitrate" = "Laju Bit";
 "Browse Library" = "Telusuri Perpustakaan";
+"Browsing" = "Penelusuran";
 "Bundle Version" = "Versi bundel";
 "Cached Data" = "Data Cache";
 "Cancel" = "Batalkan";
@@ -82,7 +83,6 @@
 "Default view" = "Tampilan default";
 "Disc" = "Disk";
 "Dismiss" = "Tutup";
-"Display" = "Tampilan";
 "Done" = "Selesai";
 "Duration" = "Durasi";
 "Effects" = "Efek";
@@ -140,7 +140,6 @@
 "Listening Rewind" = "Kilas Balik Musik";
 "Listening Statistics" = "Statistik Pemutaran";
 "Listening Time" = "Durasi Mendengarkan";
-"Listening statistics" = "Statistik pemutaran";
 "Loading lyrics…" = "Memuat lirik…";
 "Local Library" = "Perpustakaan Lokal";
 "Lock Queue" = "Kunci Antrean";
@@ -245,6 +244,7 @@
 "Scan Status" = "Status Pemindaian";
 "Scanning Library…" = "Memindai Perpustakaan…";
 "Scanning…" = "Memindai…";
+"Scrolling" = "Pengguliran";
 "Search" = "Cari";
 "Search Library" = "Cari di Perpustakaan";
 "Search Scope" = "Cakupan Pencarian";
@@ -303,7 +303,6 @@
 "Version" = "Versi";
 "View" = "Lihat";
 "Volume" = "Volume";
-"Volume and transitions" = "Volume dan transisi";
 "Weekly" = "Setiap Minggu";
 "Year" = "Tahun";
 "Your Year in Music" = "Setahun Bersama Musik";

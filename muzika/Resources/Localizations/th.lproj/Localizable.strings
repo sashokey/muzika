@@ -47,6 +47,7 @@
 "Bit Depth" = "ความลึกบิต";
 "Bitrate" = "อัตราบิต";
 "Browse Library" = "เลือกดูคลังเพลง";
+"Browsing" = "การเรียกดู";
 "Bundle Version" = "เวอร์ชันบันเดิล";
 "Cached Data" = "ข้อมูลในแคช";
 "Cancel" = "ยกเลิก";
@@ -82,7 +83,6 @@
 "Default view" = "มุมมองเริ่มต้น";
 "Disc" = "แผ่น";
 "Dismiss" = "ปิด";
-"Display" = "การแสดงผล";
 "Done" = "เสร็จสิ้น";
 "Duration" = "ระยะเวลา";
 "Effects" = "เอฟเฟ็กต์";
@@ -140,7 +140,6 @@
 "Listening Rewind" = "สรุปการฟังย้อนหลัง";
 "Listening Statistics" = "สถิติการฟัง";
 "Listening Time" = "เวลาที่ใช้ฟัง";
-"Listening statistics" = "สถิติการฟัง";
 "Loading lyrics…" = "กำลังโหลดเนื้อเพลง…";
 "Local Library" = "คลังเพลงในเครื่อง";
 "Lock Queue" = "ล็อคคิว";
@@ -245,6 +244,7 @@
 "Scan Status" = "สถานะการสแกน";
 "Scanning Library…" = "กำลังสแกนคลังเพลง…";
 "Scanning…" = "กำลังสแกน…";
+"Scrolling" = "การเลื่อน";
 "Search" = "ค้นหา";
 "Search Library" = "ค้นหาในคลังเพลง";
 "Search Scope" = "ขอบเขตการค้นหา";
@@ -303,7 +303,6 @@
 "Version" = "เวอร์ชั่น";
 "View" = "มุมมอง";
 "Volume" = "ระดับเสียง";
-"Volume and transitions" = "ระดับเสียงและการเปลี่ยนเพลง";
 "Weekly" = "ทุกสัปดาห์";
 "Year" = "ปี";
 "Your Year in Music" = "ปีแห่งการฟังเพลงของคุณ";

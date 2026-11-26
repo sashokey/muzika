@@ -47,6 +47,7 @@
 "Bit Depth" = "Profundidade de Bits";
 "Bitrate" = "Taxa de Bits";
 "Browse Library" = "Explorar Biblioteca";
+"Browsing" = "Navegação";
 "Bundle Version" = "Versão do pacote";
 "Cached Data" = "Dados em cache";
 "Cancel" = "Cancelar";
@@ -82,7 +83,6 @@
 "Default view" = "Visualização Padrão";
 "Disc" = "Disco";
 "Dismiss" = "Fechar";
-"Display" = "Exibição";
 "Done" = "OK";
 "Duration" = "Duração";
 "Effects" = "Efeitos";
@@ -140,7 +140,6 @@
 "Listening Rewind" = "Retrospectiva musical";
 "Listening Statistics" = "Estatísticas de reprodução";
 "Listening Time" = "Tempo de Reprodução";
-"Listening statistics" = "Estatísticas de Reprodução";
 "Loading lyrics…" = "Carregando a letra…";
 "Local Library" = "Biblioteca Local";
 "Lock Queue" = "Bloquear Fila";
@@ -245,6 +244,7 @@
 "Scan Status" = "Estado da análise";
 "Scanning Library…" = "Analisando a biblioteca…";
 "Scanning…" = "Analisando…";
+"Scrolling" = "Rolagem";
 "Search" = "Buscar";
 "Search Library" = "Buscar na Biblioteca";
 "Search Scope" = "Escopo da Busca";
@@ -303,7 +303,6 @@
 "Version" = "Versão";
 "View" = "Visualização";
 "Volume" = "Volume";
-"Volume and transitions" = "Volume e transições";
 "Weekly" = "Semanalmente";
 "Year" = "Ano";
 "Your Year in Music" = "Seu ano em música";

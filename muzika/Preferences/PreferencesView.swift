@@ -182,20 +182,32 @@ struct PreferencesView: View {
                         Text("Grid").tag(true)
                     }
                     .id(PreferencesItem.historyView)
-                    Toggle(PreferencesItem.continueListening.title, isOn: $history.continueListening)
-                        .onChange(of: history.continueListening) { _, value in
-                            UserDefaults.standard.set(value, forKey: "appearance.continueListening")
+                    Picker(PreferencesItem.coverArt.title, selection: $preferences.coverStyle) {
+                        ForEach(CoverStyle.allCases) { style in
+                            Text(style.title)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .tag(style)
                         }
-                        .id(PreferencesItem.continueListening)
+                    }
+                    .accessibilityLabel("Cover art")
+                    .pickerStyle(.inline)
+                    .id(PreferencesItem.coverArt)
                     Toggle(PreferencesItem.nowPlayingAlbum.title, isOn: $preferences.showsNowPlayingAlbum)
                         .id(PreferencesItem.nowPlayingAlbum)
                     Toggle(PreferencesItem.nowPlayingReleaseYear.title, isOn: $preferences.showsNowPlayingReleaseYear)
                         .id(PreferencesItem.nowPlayingReleaseYear)
                 }
+                Section("Home") {
+                    Toggle(PreferencesItem.continueListening.title, isOn: $history.continueListening)
+                        .onChange(of: history.continueListening) { _, value in
+                            UserDefaults.standard.set(value, forKey: "appearance.continueListening")
+                        }
+                        .id(PreferencesItem.continueListening)
+                }
             }
         case .playback:
             Form {
-                Section("Volume and transitions") {
+                Section("Audio") {
                     Toggle(PreferencesItem.loudVolume.title, isOn: $preferences.confirmLoudVolume)
                         .id(PreferencesItem.loudVolume)
                     SettingsSliderRow(
@@ -219,24 +231,6 @@ struct PreferencesView: View {
                     Toggle(PreferencesItem.lockQueue.title, isOn: $playback.queueLocked)
                         .id(PreferencesItem.lockQueue)
                 }
-                Section("Cover art") {
-                    Picker(PreferencesItem.coverArt.title, selection: $preferences.coverStyle) {
-                        ForEach(CoverStyle.allCases) { style in
-                            Text(style.title)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .tag(style)
-                        }
-                    }
-                    .labelsHidden()
-                    .accessibilityLabel("Cover art")
-                    .pickerStyle(.inline)
-                    .id(PreferencesItem.coverArt)
-                }
-                Section("Listening statistics") {
-                    Button(PreferencesItem.listeningStatistics.title) { state.navigate(.statistics) }
-                        .buttonStyle(GlassHoverButtonStyle.action())
-                        .id(PreferencesItem.listeningStatistics)
-                }
             }
         case .lyrics:
             Form {
@@ -252,8 +246,6 @@ struct PreferencesView: View {
                         .id(PreferencesItem.lyricsBlur)
                     Toggle(PreferencesItem.animatedWordHighlighting.title, isOn: $preferences.animatesWordHighlighting)
                         .id(PreferencesItem.animatedWordHighlighting)
-                    Toggle(PreferencesItem.autoScrollUntimedLyrics.title, isOn: $preferences.automaticallyScrollsUntimedLyrics)
-                        .id(PreferencesItem.autoScrollUntimedLyrics)
                 }
                 Section("Lyrics timing") {
                     SettingsSliderRow(
@@ -263,6 +255,10 @@ struct PreferencesView: View {
                         accessibilityTitle: Text("Lyrics timing"), minValueWidth: 82, resetValue: 0
                     )
                     .id(PreferencesItem.lyricsTiming)
+                }
+                Section("Scrolling") {
+                    Toggle(PreferencesItem.autoScrollUntimedLyrics.title, isOn: $preferences.automaticallyScrollsUntimedLyrics)
+                        .id(PreferencesItem.autoScrollUntimedLyrics)
                 }
             }
         case .localLibrary:
@@ -381,7 +377,7 @@ private struct LibraryPreferences: View {
         @Bindable var preferences = state.preferences
         let library = state.library
         Form {
-            Section("Display") {
+            Section("Browsing") {
                 Picker(PreferencesItem.defaultView.title, selection: $preferences.defaultView) {
                     ForEach(LibraryDefaultView.allCases) { view in Text(view.title).tag(view) }
                 }

@@ -47,6 +47,7 @@
 "Bit Depth" = "位深度";
 "Bitrate" = "比特率";
 "Browse Library" = "浏览资料库";
+"Browsing" = "浏览";
 "Bundle Version" = "软件包版本";
 "Cached Data" = "缓存数据";
 "Cancel" = "取消";
@@ -82,7 +83,6 @@
 "Default view" = "默认视图";
 "Disc" = "碟片";
 "Dismiss" = "关闭";
-"Display" = "显示";
 "Done" = "完成";
 "Duration" = "时长";
 "Effects" = "效果";
@@ -140,7 +140,6 @@
 "Listening Rewind" = "收听回顾";
 "Listening Statistics" = "收听统计";
 "Listening Time" = "收听时长";
-"Listening statistics" = "收听统计";
 "Loading lyrics…" = "正在载入歌词…";
 "Local Library" = "本地资料库";
 "Lock Queue" = "锁定播放队列";
@@ -245,6 +244,7 @@
 "Scan Status" = "扫描状态";
 "Scanning Library…" = "正在扫描资料库…";
 "Scanning…" = "正在扫描…";
+"Scrolling" = "滚动";
 "Search" = "搜索";
 "Search Library" = "搜索资料库";
 "Search Scope" = "搜索范围";
@@ -303,7 +303,6 @@
 "Version" = "版本";
 "View" = "显示";
 "Volume" = "音量";
-"Volume and transitions" = "音量与过渡";
 "Weekly" = "每周";
 "Year" = "年份";
 "Your Year in Music" = "年度音乐回顾";

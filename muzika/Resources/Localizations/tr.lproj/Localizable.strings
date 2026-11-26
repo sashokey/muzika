@@ -47,6 +47,7 @@
 "Bit Depth" = "Bit derinliği";
 "Bitrate" = "Bit hızı";
 "Browse Library" = "Arşivi aç";
+"Browsing" = "Göz atma";
 "Bundle Version" = "Paket sürümü";
 "Cached Data" = "Önbellekteki veriler";
 "Cancel" = "Vazgeç";
@@ -82,7 +83,6 @@
 "Default view" = "Saptanmış görünüm";
 "Disc" = "Disk";
 "Dismiss" = "Kapat";
-"Display" = "Görüntüleme";
 "Done" = "Bitti";
 "Duration" = "Süre";
 "Effects" = "Efektler";
@@ -140,7 +140,6 @@
 "Listening Rewind" = "Yıl özeti";
 "Listening Statistics" = "Dinleme istatistikleri";
 "Listening Time" = "Dinleme süresi";
-"Listening statistics" = "Dinleme istatistikleri";
 "Loading lyrics…" = "Şarkı sözleri yükleniyor…";
 "Local Library" = "Yerel arşiv";
 "Lock Queue" = "Sırayı kilitle";
@@ -245,6 +244,7 @@
 "Scan Status" = "Tarama durumu";
 "Scanning Library…" = "Arşiv taranıyor…";
 "Scanning…" = "Taranıyor…";
+"Scrolling" = "Kaydırma";
 "Search" = "Ara";
 "Search Library" = "Arşivde ara";
 "Search Scope" = "Arama kapsamı";
@@ -303,7 +303,6 @@
 "Version" = "Sürüm";
 "View" = "Görüntü";
 "Volume" = "Ses düzeyi";
-"Volume and transitions" = "Ses düzeyi ve geçişler";
 "Weekly" = "Her hafta";
 "Year" = "Yıl";
 "Your Year in Music" = "Müzikle geçen yılınız";

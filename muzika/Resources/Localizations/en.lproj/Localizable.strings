@@ -47,6 +47,7 @@
 "Bit Depth" = "Bit Depth";
 "Bitrate" = "Bitrate";
 "Browse Library" = "Browse Library";
+"Browsing" = "Browsing";
 "Bundle Version" = "Bundle Version";
 "Cached Data" = "Cached Data";
 "Cancel" = "Cancel";
@@ -82,7 +83,6 @@
 "Default view" = "Default view";
 "Disc" = "Disc";
 "Dismiss" = "Dismiss";
-"Display" = "Display";
 "Done" = "Done";
 "Duration" = "Duration";
 "Effects" = "Effects";
@@ -140,7 +140,6 @@
 "Listening Rewind" = "Listening Rewind";
 "Listening Statistics" = "Listening Statistics";
 "Listening Time" = "Listening Time";
-"Listening statistics" = "Listening statistics";
 "Loading lyrics…" = "Loading lyrics…";
 "Local Library" = "Local Library";
 "Lock Queue" = "Lock Queue";
@@ -245,6 +244,7 @@
 "Scan Status" = "Scan Status";
 "Scanning Library…" = "Scanning Library…";
 "Scanning…" = "Scanning…";
+"Scrolling" = "Scrolling";
 "Search" = "Search";
 "Search Library" = "Search Library";
 "Search Scope" = "Search Scope";
@@ -303,7 +303,6 @@
 "Version" = "Version";
 "View" = "View";
 "Volume" = "Volume";
-"Volume and transitions" = "Volume and transitions";
 "Weekly" = "Weekly";
 "Year" = "Year";
 "Your Year in Music" = "Your Year in Music";

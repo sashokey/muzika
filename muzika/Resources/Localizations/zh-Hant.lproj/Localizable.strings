@@ -47,6 +47,7 @@
 "Bit Depth" = "位深度";
 "Bitrate" = "位元率";
 "Browse Library" = "瀏覽資料庫";
+"Browsing" = "瀏覽";
 "Bundle Version" = "套件版本";
 "Cached Data" = "快取資料";
 "Cancel" = "取消";
@@ -82,7 +83,6 @@
 "Default view" = "預設視圖";
 "Disc" = "碟片";
 "Dismiss" = "關閉";
-"Display" = "顯示";
 "Done" = "完成";
 "Duration" = "時長";
 "Effects" = "效果";
@@ -140,7 +140,6 @@
 "Listening Rewind" = "收聽回顧";
 "Listening Statistics" = "收聽統計";
 "Listening Time" = "收聽時長";
-"Listening statistics" = "收聽統計";
 "Loading lyrics…" = "正在載入歌詞…";
 "Local Library" = "本地資料庫";
 "Lock Queue" = "鎖定播放隊列";
@@ -245,6 +244,7 @@
 "Scan Status" = "掃描狀態";
 "Scanning Library…" = "正在掃描資料庫…";
 "Scanning…" = "正在掃描…";
+"Scrolling" = "捲動";
 "Search" = "搜尋";
 "Search Library" = "搜尋資料庫";
 "Search Scope" = "搜尋範圍";
@@ -303,7 +303,6 @@
 "Version" = "版本";
 "View" = "顯示";
 "Volume" = "音量";
-"Volume and transitions" = "音量與過渡";
 "Weekly" = "每周";
 "Year" = "年份";
 "Your Year in Music" = "年度音樂回顧";

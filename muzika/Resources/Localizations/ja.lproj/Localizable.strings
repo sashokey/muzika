@@ -47,6 +47,7 @@
 "Bit Depth" = "ビット深度";
 "Bitrate" = "ビットレート";
 "Browse Library" = "ライブラリをブラウズ";
+"Browsing" = "ブラウズ";
 "Bundle Version" = "バンドルバージョン";
 "Cached Data" = "キャッシュデータ";
 "Cancel" = "キャンセル";
@@ -82,7 +83,6 @@
 "Default view" = "デフォルトの表示";
 "Disc" = "ディスク";
 "Dismiss" = "閉じる";
-"Display" = "表示";
 "Done" = "完了";
 "Duration" = "長さ";
 "Effects" = "エフェクト";
@@ -140,7 +140,6 @@
 "Listening Rewind" = "再生の振り返り";
 "Listening Statistics" = "再生統計";
 "Listening Time" = "再生時間";
-"Listening statistics" = "再生統計";
 "Loading lyrics…" = "歌詞を読み込み中…";
 "Local Library" = "ローカルライブラリ";
 "Lock Queue" = "キューをロック";
@@ -245,6 +244,7 @@
 "Scan Status" = "スキャン状況";
 "Scanning Library…" = "ライブラリをスキャン中…";
 "Scanning…" = "スキャン中…";
+"Scrolling" = "スクロール";
 "Search" = "検索";
 "Search Library" = "ライブラリを検索";
 "Search Scope" = "検索範囲";
@@ -303,7 +303,6 @@
 "Version" = "バージョン";
 "View" = "表示";
 "Volume" = "音量";
-"Volume and transitions" = "音量と曲の切り替え";
 "Weekly" = "毎週";
 "Year" = "年";
 "Your Year in Music" = "今年の音楽を振り返る";

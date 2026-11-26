@@ -47,6 +47,7 @@
 "Bit Depth" = "Разрядность";
 "Bitrate" = "Битрейт";
 "Browse Library" = "Открыть медиатеку";
+"Browsing" = "Просмотр";
 "Bundle Version" = "Версия пакета";
 "Cached Data" = "Данные в кэше";
 "Cancel" = "Отменить";
@@ -82,7 +83,6 @@
 "Default view" = "Начальный раздел";
 "Disc" = "Диск";
 "Dismiss" = "Закрыть";
-"Display" = "Отображение";
 "Done" = "Готово";
 "Duration" = "Длительность";
 "Effects" = "Эффекты";
@@ -140,7 +140,6 @@
 "Listening Rewind" = "Итоги года";
 "Listening Statistics" = "Статистика прослушивания";
 "Listening Time" = "Время прослушивания";
-"Listening statistics" = "Статистика прослушивания";
 "Loading lyrics…" = "Загрузка текста песни…";
 "Local Library" = "Локальная медиатека";
 "Lock Queue" = "Заблокировать очередь";
@@ -245,6 +244,7 @@
 "Scan Status" = "Состояние сканирования";
 "Scanning Library…" = "Сканирование медиатеки…";
 "Scanning…" = "Сканирование…";
+"Scrolling" = "Прокрутка";
 "Search" = "Поиск";
 "Search Library" = "Поиск в медиатеке";
 "Search Scope" = "Область поиска";
@@ -303,7 +303,6 @@
 "Version" = "Версия";
 "View" = "Вид";
 "Volume" = "Громкость";
-"Volume and transitions" = "Громкость и переходы";
 "Weekly" = "Еженедельно";
 "Year" = "Год";
 "Your Year in Music" = "Ваш год в музыке";

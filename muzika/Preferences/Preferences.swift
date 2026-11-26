@@ -45,6 +45,7 @@ enum PreferencesItem: String, CaseIterable, Identifiable {
     case nowPlayingReleaseYear = "Show release year in Now Playing"
     case interfaceSize = "Interface size"
     case historyView = "History View"
+    case coverArt = "Cover art"
     case continueListening = "Continue listening"
     case loudVolume = "Confirm loud volume"
     case loudVolumeThreshold = "Ask above"
@@ -52,8 +53,6 @@ enum PreferencesItem: String, CaseIterable, Identifiable {
     case noDuplicates = "No duplicates in queue"
     case lockQueue = "Lock queue"
     case spatialAudio = "Spatial audio"
-    case coverArt = "Cover art"
-    case listeningStatistics = "Listening statistics"
     case lyricsSize = "Lyrics text size"
     case lyricsBlur = "Lyrics blur"
     case animatedWordHighlighting = "Animated word highlighting"
@@ -88,6 +87,7 @@ enum PreferencesItem: String, CaseIterable, Identifiable {
         case .nowPlayingReleaseYear: String(localized: "Show release year in Now Playing")
         case .interfaceSize: String(localized: "Interface size")
         case .historyView: String(localized: "History View")
+        case .coverArt: String(localized: "Cover art")
         case .continueListening: String(localized: "Continue listening")
         case .loudVolume: String(localized: "Confirm loud volume")
         case .loudVolumeThreshold: String(localized: "Ask above")
@@ -95,8 +95,6 @@ enum PreferencesItem: String, CaseIterable, Identifiable {
         case .noDuplicates: String(localized: "No duplicates in queue")
         case .lockQueue: String(localized: "Lock queue")
         case .spatialAudio: String(localized: "Spatial audio")
-        case .coverArt: String(localized: "Cover art")
-        case .listeningStatistics: String(localized: "Listening statistics")
         case .lyricsSize: String(localized: "Lyrics text size")
         case .lyricsBlur: String(localized: "Lyrics blur")
         case .animatedWordHighlighting: String(localized: "Animated word highlighting")
@@ -125,10 +123,9 @@ enum PreferencesItem: String, CaseIterable, Identifiable {
     var page: PreferencesPage {
         switch self {
         case .heroAnimations, .blurEffects, .nowPlayingAudioSpectrum, .nowPlayingAlbum, .nowPlayingReleaseYear,
-             .interfaceSize, .historyView, .continueListening:
+             .interfaceSize, .historyView, .coverArt, .continueListening:
             .appearance
-        case .loudVolume, .loudVolumeThreshold, .gapless, .noDuplicates, .lockQueue, .spatialAudio,
-             .coverArt, .listeningStatistics:
+        case .loudVolume, .loudVolumeThreshold, .gapless, .noDuplicates, .lockQueue, .spatialAudio:
             .playback
         case .lyricsSize, .lyricsBlur, .animatedWordHighlighting, .autoScrollUntimedLyrics, .lyricsTiming:
             .lyrics

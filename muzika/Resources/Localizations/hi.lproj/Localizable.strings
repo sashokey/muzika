@@ -47,6 +47,7 @@
 "Bit Depth" = "बिट डेप्थ";
 "Bitrate" = "बिटरेट";
 "Browse Library" = "लाइब्रेरी ब्राउज़ करें";
+"Browsing" = "ब्राउज़िंग";
 "Bundle Version" = "बंडल संस्करण";
 "Cached Data" = "कैश में सहेजा गया डेटा";
 "Cancel" = "रद्द करें";
@@ -82,7 +83,6 @@
 "Default view" = "डिफ़ॉल्ट व्यू";
 "Disc" = "डिस्क";
 "Dismiss" = "बंद करें";
-"Display" = "डिस्प्ले";
 "Done" = "हो गया";
 "Duration" = "अवधि";
 "Effects" = "इफ़ेक्ट";
@@ -140,7 +140,6 @@
 "Listening Rewind" = "सुनने की झलकियाँ";
 "Listening Statistics" = "सुनने के आँकड़े";
 "Listening Time" = "सुनने का समय";
-"Listening statistics" = "सुनने के आँकड़े";
 "Loading lyrics…" = "गीत के बोल लोड किए जा रहे हैं…";
 "Local Library" = "स्थानीय लाइब्रेरी";
 "Lock Queue" = "क़तार लॉक करें";
@@ -245,6 +244,7 @@
 "Scan Status" = "स्कैन की स्थिति";
 "Scanning Library…" = "लाइब्रेरी स्कैन की जा रही है…";
 "Scanning…" = "स्कैन किया जा रहा है…";
+"Scrolling" = "स्क्रॉलिंग";
 "Search" = "खोजें";
 "Search Library" = "लाइब्रेरी में खोजें";
 "Search Scope" = "खोज का दायरा";
@@ -303,7 +303,6 @@
 "Version" = "वर्शन";
 "View" = "व्यू";
 "Volume" = "वॉल्यूम";
-"Volume and transitions" = "वॉल्यूम और ट्रांज़िशन";
 "Weekly" = "हर हफ़्ते";
 "Year" = "साल";
 "Your Year in Music" = "संगीत के साथ आपका साल";

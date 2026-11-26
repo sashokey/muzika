@@ -47,6 +47,7 @@
 "Bit Depth" = "비트 깊이";
 "Bitrate" = "비트율";
 "Browse Library" = "보관함 둘러보기";
+"Browsing" = "탐색";
 "Bundle Version" = "번들 버전";
 "Cached Data" = "캐시 데이터";
 "Cancel" = "취소";
@@ -82,7 +83,6 @@
 "Default view" = "기본 보기";
 "Disc" = "디스크";
 "Dismiss" = "닫기";
-"Display" = "표시";
 "Done" = "완료";
 "Duration" = "재생 시간";
 "Effects" = "효과";
@@ -140,7 +140,6 @@
 "Listening Rewind" = "듣기 돌아보기";
 "Listening Statistics" = "재생 통계";
 "Listening Time" = "청취 시간";
-"Listening statistics" = "재생 통계";
 "Loading lyrics…" = "가사 불러오는 중…";
 "Local Library" = "로컬 보관함";
 "Lock Queue" = "재생 대기 목록 잠금";
@@ -245,6 +244,7 @@
 "Scan Status" = "스캔 상태";
 "Scanning Library…" = "보관함 스캔 중…";
 "Scanning…" = "스캔 중…";
+"Scrolling" = "스크롤";
 "Search" = "검색";
 "Search Library" = "보관함 검색";
 "Search Scope" = "검색 범위";
@@ -303,7 +303,6 @@
 "Version" = "버전";
 "View" = "보기";
 "Volume" = "음량";
-"Volume and transitions" = "음량 및 노래 전환";
 "Weekly" = "매주";
 "Year" = "연도";
 "Your Year in Music" = "올해 들은 음악 돌아보기";
