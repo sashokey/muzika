@@ -81,7 +81,7 @@ struct ArtworkSpectrumBadge: View {
                 let progress = (level - Self.minimumSpectrumLevel) / (1 - Self.minimumSpectrumLevel)
                 Capsule()
                     .fill(.foreground)
-                    .frame(width: column * (0.22 + 0.56 * level),
+                    .frame(width: column * 0.5,
                            height: restingHeight + (peakHeight - restingHeight) * progress)
                     .frame(width: column, height: peakHeight)
             }
