@@ -143,7 +143,7 @@ private struct GroupGridCard: View {
         } else if presentation == .list {
             HStack(spacing: 10) {
                 BrowseArtwork(library: library, track: group.artworkTrack, symbol: group.route.symbol,
-                              pixelSize: 96, circular: circular)
+                              pixelSize: BrowseArtwork.smallThumbnailPixels, circular: circular)
                     .frame(width: 36, height: 36)
                 Text(group.title).lineLimit(1)
                 Spacer()
@@ -174,23 +174,70 @@ private struct GroupGridHoverBackdrop: View {
 }
 
 private final class GroupGridHoverBackdropHost: NSHostingView<GroupGridHoverBackdrop> {
-    private static let opacityKey = "group-hover-opacity"
-
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
 
+private final class GroupGridInteractionHost: NSHostingView<GroupGridCard> {
+    private var fade: Task<Void, Never>?
+
+    var isFading: Bool { fade != nil }
+
+    isolated deinit { fade?.cancel() }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        isFading ? nil : super.hitTest(point)
+    }
+
+    func present(_ root: GroupGridCard, in frame: CGRect, animated: Bool, startsHidden: Bool = false) {
+        cancelFade()
+        rootView = root
+        self.frame = frame
+        isHidden = false
+        setGroupHoverOpacity(true, animated: animated, startsHidden: startsHidden)
+    }
+
+    func conceal(with root: GroupGridCard) {
+        cancelFade()
+        isHidden = true
+        rootView = root
+    }
+
+    func fadeOut(animated: Bool, completion: @escaping @MainActor () -> Void) {
+        cancelFade()
+        let duration = setGroupHoverOpacity(false, animated: animated)
+        guard duration > 0 else {
+            completion()
+            return
+        }
+        fade = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: .seconds(duration)) }
+            catch { return }
+            self?.fade = nil
+            completion()
+        }
+    }
+
+    private func cancelFade() {
+        fade?.cancel()
+        fade = nil
+    }
+}
+
+private extension NSView {
     @discardableResult
-    func setHighlighted(_ highlighted: Bool, animated: Bool, startsHidden: Bool = false) -> TimeInterval {
+    func setGroupHoverOpacity(_ highlighted: Bool, animated: Bool, startsHidden: Bool = false) -> TimeInterval {
         wantsLayer = true
         guard let layer else { return 0 }
+        let opacityKey = "group-hover-opacity"
         let target: Float = highlighted ? 1 : 0
-        let active = layer.animation(forKey: Self.opacityKey) as? CABasicAnimation
+        let active = layer.animation(forKey: opacityKey) as? CABasicAnimation
         let start = startsHidden ? 0 : layer.presentation()?.opacity ?? (active?.fromValue as? NSNumber)?.floatValue ?? layer.opacity
 
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         defer { CATransaction.commit() }
         layer.opacity = target
-        layer.removeAnimation(forKey: Self.opacityKey)
+        layer.removeAnimation(forKey: opacityKey)
         guard animated, start != target else { return 0 }
 
         let animation = CASpringAnimation(perceptualDuration: GlassHoverMotion.duration, bounce: 0)
@@ -198,7 +245,7 @@ private final class GroupGridHoverBackdropHost: NSHostingView<GroupGridHoverBack
         animation.fromValue = start
         animation.toValue = target
         animation.duration = animation.settlingDuration
-        layer.add(animation, forKey: Self.opacityKey)
+        layer.add(animation, forKey: opacityKey)
         return animation.duration
     }
 }
@@ -286,7 +333,7 @@ private struct GroupGridSurface: NSViewRepresentable {
         private var requiresRefresh = false
         private var nativeCards = false
         private var tracking: NSTrackingArea?
-        private var interaction: CardHost?
+        private var interaction: GroupGridInteractionHost?
         private var hoverBackdrop: GroupGridHoverBackdropHost?
         private var fadingBackdrop: GroupGridHoverBackdropHost?
         private var fadeRemoval: Task<Void, Never>?
@@ -363,7 +410,7 @@ private struct GroupGridSurface: NSViewRepresentable {
 
         override func mouseEntered(with event: NSEvent) { updateInteraction(at: event.locationInWindow) }
         override func mouseMoved(with event: NSEvent) { updateInteraction(at: event.locationInWindow) }
-        override func mouseExited(with event: NSEvent) { clearInteraction() }
+        override func mouseExited(with event: NSEvent) { clearInteraction(animateButton: true) }
         @objc private func keyWindowChanged() { updateInteraction() }
 
         private func connectToScrollView() {
@@ -395,7 +442,7 @@ private struct GroupGridSurface: NSViewRepresentable {
             currentLayout = layout
             requiresRefresh = false
 
-            if let interactionIndex, refresh || !items.contains(interactionIndex) { clearInteraction() }
+            if refresh || interactionIndex.map({ !items.contains($0) }) == true { clearInteraction() }
             for index in Array(cards.keys) where !items.contains(index) {
                 guard let view = cards.removeValue(forKey: index) else { continue }
                 view.isHidden = true
@@ -471,7 +518,7 @@ private struct GroupGridSurface: NSViewRepresentable {
             let point = convert(location ?? window.mouseLocationOutsideOfEventStream, from: nil)
             guard visibleRect.contains(point),
                   let (index, view) = cards.first(where: { $0.value.frame.contains(point) }) else {
-                clearInteraction()
+                clearInteraction(animateButton: true)
                 return
             }
             let frame = view.frame
@@ -489,23 +536,32 @@ private struct GroupGridSurface: NSViewRepresentable {
             #endif
             let root = card(configuration, index: index, width: frame.width, nativeCardHeight: frame.height,
                             nativeButtonHovered: buttonHovered)
-            if interactionIndex != index {
+            let entersRow = interactionIndex != index
+            let animated = !configuration.appearance.reduceMotion
+            let fadesButton = !entersRow && interactionButtonHovered == true && buttonHovered == false
+            let reversesFade = !entersRow && interaction?.isFading == true && buttonHovered == true
+            if entersRow {
                 clearInteraction()
                 interactionIndex = index
                 placeHoverBackdrop(behind: view, presentation: configuration.presentation,
-                                   animated: !configuration.appearance.reduceMotion)
+                                   animated: animated)
             }
             interactionButtonHovered = buttonHovered
-            if let interaction {
-                interaction.rootView = root
-                interaction.frame = frame
-                interaction.isHidden = false
-            } else {
-                let host = NSHostingView(rootView: root)
+            if interaction == nil {
+                let host = GroupGridInteractionHost(rootView: root)
                 host.sizingOptions = []
                 host.frame = frame
                 addSubview(host, positioned: .above, relativeTo: nil)
                 interaction = host
+            }
+            guard let interaction else { return }
+            if fadesButton {
+                interaction.fadeOut(animated: animated) { [weak interaction] in
+                    interaction?.present(root, in: frame, animated: false)
+                }
+            } else {
+                let fadesIn = entersRow && buttonHovered == true
+                interaction.present(root, in: frame, animated: animated && (fadesIn || reversesFade), startsHidden: fadesIn)
             }
         }
 
@@ -518,7 +574,7 @@ private struct GroupGridSurface: NSViewRepresentable {
                 fadeRemoval?.cancel()
                 self.fadingBackdrop = hoverBackdrop
                 hoverBackdrop = fadingBackdrop
-                fadingBackdrop.setHighlighted(true, animated: animated)
+                fadingBackdrop.setGroupHoverOpacity(true, animated: animated)
                 return
             }
             let backdrop = GroupGridHoverBackdrop(outset: outset)
@@ -527,12 +583,17 @@ private struct GroupGridSurface: NSViewRepresentable {
             host.sizingOptions = []
             host.frame = frame
             addSubview(host, positioned: .below, relativeTo: card)
-            host.setHighlighted(true, animated: animated, startsHidden: true)
+            host.setGroupHoverOpacity(true, animated: animated, startsHidden: true)
             hoverBackdrop = host
         }
 
-        private func clearInteraction() {
-            guard interactionIndex != nil else { return }
+        private func clearInteraction(animateButton: Bool = false) {
+            guard interactionIndex != nil else {
+                if !animateButton, let interaction, interaction.isFading, let configuration {
+                    interaction.conceal(with: card(configuration, index: nil, width: 0))
+                }
+                return
+            }
             #if MUZIKA_DEV_LOGS
             MuzikaTrace.event(.library, "group.hover.exit", "row=\(interactionIndex ?? -1) reduce_motion=\(configuration?.appearance.reduceMotion == true)")
             #endif
@@ -542,7 +603,7 @@ private struct GroupGridSurface: NSViewRepresentable {
             fadingBackdrop = hoverBackdrop
             hoverBackdrop = spare
             if let fadingBackdrop {
-                let duration = fadingBackdrop.setHighlighted(false, animated: configuration?.appearance.reduceMotion == false)
+                let duration = fadingBackdrop.setGroupHoverOpacity(false, animated: configuration?.appearance.reduceMotion == false)
                 if duration == 0 {
                     fadingBackdrop.removeFromSuperview()
                 } else {
@@ -553,11 +614,18 @@ private struct GroupGridSurface: NSViewRepresentable {
                     }
                 }
             }
+            let buttonWasVisible = interactionButtonHovered == true || interaction?.isFading == true
             interactionIndex = nil
             interactionButtonHovered = nil
             if let interaction, let configuration {
-                interaction.isHidden = true
-                interaction.rootView = card(configuration, index: nil, width: 0)
+                let empty = card(configuration, index: nil, width: 0)
+                if animateButton, buttonWasVisible, configuration.presentation == .list {
+                    interaction.fadeOut(animated: !configuration.appearance.reduceMotion) { [weak interaction] in
+                        interaction?.conceal(with: empty)
+                    }
+                } else {
+                    interaction.conceal(with: empty)
+                }
             }
         }
 

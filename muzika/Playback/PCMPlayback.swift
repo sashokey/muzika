@@ -25,12 +25,24 @@ final class PCMPlayback: PlaybackTransport {
         }
     }
 
+    private struct SpectrumBlock {
+        let start: AVAudioFramePosition
+        let trackStart: AVAudioFramePosition
+        let buffer: AVAudioPCMBuffer
+
+        var end: AVAudioFramePosition { start + Int64(buffer.frameLength) }
+    }
+
     private let engine: AVAudioEngine?
     private let player: AVAudioPlayerNode?
     private let spatialOutput: SpatialPCMOutput?
     private let mode: Mode
     private let spectrumMailbox = SpectrumMailbox()
     private lazy var analyzer = FrequencySpectrum(mailbox: spectrumMailbox)
+    private lazy var audioInfoAnalyzer = AudioInfoSpectrum()
+    private var audioInfoEnabled = false
+    private var audioInfoBlocks: [SpectrumBlock] = []
+    private var audioInfoTrackStart: AVAudioFramePosition?
     private var tapInstalled = false
     private var spatialSpectrumEnabled = false
     private var spatialSpectrumFrames: [(start: AVAudioFramePosition, buffer: AVAudioPCMBuffer)] = []
@@ -127,6 +139,53 @@ final class PCMPlayback: PlaybackTransport {
         return analyzer.read()
     }
 
+    func setAudioInfoSpectrumEnabled(_ enabled: Bool) {
+        guard audioInfoEnabled != enabled else { return }
+        audioInfoEnabled = enabled
+        if !enabled { audioInfoAnalyzer.reset() }
+    }
+
+    func audioInfoSpectrum() -> [Float] {
+        guard audioInfoEnabled, let frame = audioInfoFrame,
+              let trackStart = audioInfoBlocks.first(where: { $0.start <= frame && frame < $0.end })?.trackStart else {
+            return []
+        }
+        if audioInfoTrackStart != trackStart {
+            audioInfoAnalyzer.reset()
+            audioInfoTrackStart = trackStart
+        }
+        let start = frame - Int64(AudioInfoSpectrum.pcmFrameCount / 2)
+        let end = start + Int64(AudioInfoSpectrum.pcmFrameCount)
+        return audioInfoAnalyzer.read { left, right in
+            left.update(repeating: 0)
+            right.update(repeating: 0)
+            for block in audioInfoBlocks where block.trackStart == trackStart && block.start < end && block.end > start {
+                guard let channels = block.buffer.floatChannelData else { continue }
+                let lower = max(start, block.start)
+                let count = Int(min(end, block.end) - lower)
+                let source = Int(lower - block.start)
+                let destination = Int(lower - start)
+                (left.baseAddress! + destination).update(from: channels[0] + source, count: count)
+                (right.baseAddress! + destination).update(from: channels[1] + source, count: count)
+            }
+            return .samples(frame: frame, sampleRate: PCMStreamFormat.sampleRate)
+        }
+    }
+
+    private var audioInfoFrame: AVAudioFramePosition? {
+        guard requestedPlayback, started else { return nil }
+        if mode == .offline || spatialOutput != nil { return renderedFrame }
+        guard let player, player.isPlaying, let node = player.lastRenderTime, node.isHostTimeValid,
+              node.isSampleTimeValid, let time = player.playerTime(forNodeTime: node),
+              time.isSampleTimeValid, time.sampleRate > 0 else { return nil }
+        let now = AVAudioTime.seconds(forHostTime: mach_absolute_time())
+        let rendered = AVAudioTime.seconds(forHostTime: node.hostTime)
+        let latency = player.outputPresentationLatency
+        let offset = latency.isFinite ? min(0.5, max(0, latency)) : 0
+        let position = Double(time.sampleTime) / time.sampleRate + (now - rendered) - offset
+        return AVAudioFramePosition(min(Double(scheduledFrame), max(0, position * PCMStreamFormat.sampleRate)))
+    }
+
     var isRendering: Bool {
         (spatialOutput?.isPlaying ?? player?.isPlaying ?? false) && renderedFrame < scheduledFrame
     }
@@ -193,6 +252,9 @@ final class PCMPlayback: PlaybackTransport {
         if mode == .realtime, engine?.isRunning == true { engine?.stop() }
         spatialOutput?.reset()
         if tapInstalled || spatialSpectrumEnabled { analyzer.reset() }
+        if audioInfoEnabled { audioInfoAnalyzer.reset() }
+        audioInfoBlocks.removeAll(keepingCapacity: true)
+        audioInfoTrackStart = nil
         spatialSpectrumFrames.removeAll(keepingCapacity: true)
         lastSpectrumFrame = 0
         segments.removeAll()
@@ -229,6 +291,10 @@ final class PCMPlayback: PlaybackTransport {
     private func updateRenderedProgress() {
         guard started else { return }
         let now = renderedFrame
+        let history = Int64(PCMStreamFormat.sampleRate / 2) + Int64(AudioInfoSpectrum.pcmFrameCount)
+        if let first = audioInfoBlocks.first, first.end < now - history {
+            audioInfoBlocks.removeAll { $0.end < now - history }
+        }
         if spatialSpectrumEnabled {
             spatialSpectrumFrames.removeAll { $0.start + Int64($0.buffer.frameLength) < now }
         }
@@ -319,6 +385,7 @@ final class PCMPlayback: PlaybackTransport {
                 } else {
                     player?.scheduleBuffer(chunk.buffer, at: nil, options: [], completionHandler: nil)
                 }
+                audioInfoBlocks.append(SpectrumBlock(start: scheduledFrame, trackStart: segment.startFrame, buffer: chunk.buffer))
                 scheduledFrame += Int64(chunk.buffer.frameLength)
             } catch {
                 onError?(segment.source.id, error)

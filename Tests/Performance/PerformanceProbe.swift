@@ -1,10 +1,12 @@
 import AppKit
+import AVFAudio
 import CoreImage
 import Darwin
 import Foundation
 import Metal
 import OSLog
 import QuartzCore
+import ScreenCaptureKit
 import SwiftUI
 import Synchronization
 
@@ -400,6 +402,10 @@ enum PerformanceProbe {
                 else { throw CocoaError(.validationMissingMandatoryProperty) }
                 fixture.state.navigate(artist.route)
             },
+            Action("genres.artwork_hover_animation") { fixture in try await verifyGenreArtworkHover(fixture) },
+            Action("songs.artwork_cache_size") { fixture in try await verifySongsArtworkCache(fixture) },
+            Action("artwork.shared_thumbnail_cache") { fixture in try await verifySharedThumbnailCache(fixture) },
+            Action("queue.header_and_current_track_raster") { fixture in try await verifyQueueRaster(fixture) },
             Action("navigation.back") { $0.state.back() },
             Action("navigation.forward") { $0.state.forward() },
             Action("search.query") { fixture in
@@ -429,6 +435,8 @@ enum PerformanceProbe {
             Action("playback.volume") { $0.state.setVolume(0.35) },
             Action("player.open") { $0.state.showPlayer() },
             Action("player.audio_info_spectrum_width") { _ in try verifyAudioInfoSpectrumWidth() },
+            Action("player.audio_info_spectrum_timing") { _ in try await verifyAudioInfoSpectrumTiming() },
+            Action("player.audio_info_spectrum_high_sample_rate") { _ in try verifyAudioInfoSpectrumAtHighSampleRate() },
             Action("player.track_credit_visibility") { try verifyTrackCreditVisibility($0.media[0]) },
             Action("player.lyrics") { $0.state.togglePanel(.lyrics) },
             Action("lyrics.auto_follow") { fixture in
@@ -488,19 +496,319 @@ enum PerformanceProbe {
         ]
     }
 
+    private final class HoverCheckWindow: NSWindow {
+        var pointer = CGPoint(x: -100, y: -100)
+        override var isKeyWindow: Bool { true }
+        override var mouseLocationOutsideOfEventStream: NSPoint { pointer }
+    }
+
+    private static func verifyQueueRaster(_ fixture: Fixture) async throws {
+        let tracks = fixture.media + Array(fixture.state.library.tracks.prefix(24))
+        fixture.state.playback.addToQueue(tracks, next: false)
+        fixture.state.togglePanel(.queue)
+        defer {
+            fixture.state.closePlayer()
+            fixture.state.playback.dismiss()
+        }
+        for _ in 0..<10 {
+            fixture.host.layoutSubtreeIfNeeded()
+            try await Task.sleep(for: .milliseconds(35))
+        }
+        let host = fixture.host
+        guard let scroll = StressScrollCheck.scrollViews(in: host).first(where: {
+            $0.convert($0.bounds, to: host).minX >= host.bounds.width * 0.4
+        }) else { throw HomeScrollCheck.Failure("Up Next list did not appear") }
+        let rect = scroll.convert(scroll.bounds, to: host)
+        guard let bitmap = host.bitmapImageRepForCachingDisplay(in: rect) else {
+            throw HomeScrollCheck.Failure("Up Next list raster was unavailable")
+        }
+        host.cacheDisplay(in: rect, to: bitmap)
+        let scale = CGFloat(bitmap.pixelsWide) / rect.width
+        func pixels(_ points: CGFloat) -> Int { Int((points * scale).rounded()) }
+        func color(x: Int, y: Int) -> NSColor? { bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) }
+        for headerEnd in [28.0, 104.0] {
+            let edge = bitmap.pixelsWide - 1
+            let y = pixels(headerEnd) - 1
+            if let mark = color(x: edge, y: y), let interior = color(x: edge - 1, y: y),
+               mark.redComponent - interior.redComponent > 0.025,
+               mark.greenComponent - interior.greenComponent > 0.025 {
+                throw HomeScrollCheck.Failure("Up Next header has an isolated pixel at its trailing edge")
+            }
+        }
+        var bars = 0
+        var previous = false
+        for x in (bitmap.pixelsWide - pixels(64))..<(bitmap.pixelsWide - pixels(36)) {
+            let filled = (pixels(39)..<pixels(63)).contains { y in
+                guard let color = color(x: x, y: y) else { return false }
+                return min(color.redComponent, color.greenComponent, color.blueComponent) > 0.55
+            }
+            if filled && !previous { bars += 1 }
+            previous = filled
+        }
+        guard bars == 5 else { throw HomeScrollCheck.Failure("Up Next current track has \(bars) visible visualizer bars") }
+    }
+
+    private static func verifySongsArtworkCache(_ fixture: Fixture) async throws {
+        let track = fixture.media[0]
+        let window = HoverCheckWindow(contentRect: CGRect(x: 0, y: 0, width: 640, height: 240),
+                                      styleMask: .borderless, backing: .buffered, defer: false)
+        let host = NSHostingView(rootView: BrowseTrackTable(
+            library: fixture.state.library, tracks: [track], playback: fixture.state.playback, usesSongsArtwork: true
+        ))
+        window.contentView = host
+        for _ in 0..<25 {
+            host.layoutSubtreeIfNeeded()
+            if let image = BrowseArtwork.cachedThumbnail(for: track, pixelSize: 44) {
+                guard max(image.width, image.height) == 44 else {
+                    throw HomeScrollCheck.Failure("Songs cached larger artwork than its 22 pt cell needs at 2×")
+                }
+                return
+            }
+            if let image = BrowseArtwork.cachedThumbnail(for: track, pixelSize: 64) {
+                throw HomeScrollCheck.Failure("Songs cached \(image.width)×\(image.height) instead of 44 px artwork")
+            }
+            try await Task.sleep(for: .milliseconds(35))
+        }
+        throw HomeScrollCheck.Failure("Could not load the Songs artwork fixture")
+    }
+
+    private static func verifySharedThumbnailCache(_ fixture: Fixture) async throws {
+        let track = fixture.media[0]
+        let library = fixture.state.library
+        guard let queueImage = await BrowseArtwork.loadThumbnail(for: track, in: library, pixelSize: 88) else {
+            throw HomeScrollCheck.Failure("Could not prefetch the Up Next artwork fixture")
+        }
+        let window = HoverCheckWindow(contentRect: CGRect(x: 0, y: 0, width: 520, height: 240),
+                                      styleMask: .borderless, backing: .buffered, defer: false)
+        let groups = BrowseGroup.genres([track])
+        let host = NSHostingView(rootView: BrowseGroupGrid(groups: groups, library: library,
+            playback: fixture.state.playback, open: { _ in }, presentation: .list
+        ).dynamicTypeSize(.large).environment(\.layoutDirection, .leftToRight))
+        let scrollView = NSScrollView(frame: CGRect(x: 0, y: 0, width: 520, height: 240))
+        host.frame = scrollView.bounds
+        scrollView.documentView = host
+        window.contentView = scrollView
+        func usesCachedImage(_ layer: CALayer) -> Bool {
+            (layer.contents as AnyObject?) === queueImage || (layer.sublayers ?? []).contains { usesCachedImage($0) }
+        }
+        func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
+        for _ in 0..<25 {
+            host.layoutSubtreeIfNeeded()
+            if descendants(host).compactMap({ $0 as? NativeGroupCard }).contains(where: {
+                $0.layer.map(usesCachedImage) == true
+            }) { return }
+            if BrowseArtwork.cachedThumbnail(for: track, pixelSize: 96) != nil {
+                throw HomeScrollCheck.Failure("Genres decoded a 96 px copy of the cached Up Next thumbnail")
+            }
+            try await Task.sleep(for: .milliseconds(35))
+        }
+        throw HomeScrollCheck.Failure("Genres did not display the prefetched Up Next thumbnail")
+    }
+
+    private static func verifyGenreArtworkHover(_ fixture: Fixture) async throws {
+        let window = HoverCheckWindow(contentRect: CGRect(x: 0, y: 0, width: 520, height: 240),
+                                      styleMask: .borderless, backing: .buffered, defer: false)
+        let groups = BrowseGroup.genres(fixture.media)
+        let host = NSHostingView(rootView: BrowseGroupGrid(
+            groups: groups, library: fixture.state.library, playback: fixture.state.playback,
+            open: { _ in }, presentation: .list
+        ).dynamicTypeSize(.large).environment(\.layoutDirection, .leftToRight))
+        let scrollView = NSScrollView(frame: CGRect(x: 0, y: 0, width: 520, height: 240))
+        host.frame = scrollView.bounds
+        scrollView.documentView = host
+        window.contentView = scrollView
+        let capturesFrames = ProcessInfo.processInfo.environment["MUZIKA_CHECK_GENRES_FRAMES"] == "1"
+        if capturesFrames {
+            window.ignoresMouseEvents = true
+            window.orderBack(nil)
+        }
+        defer { window.orderOut(nil) }
+        for _ in 0..<4 {
+            host.layoutSubtreeIfNeeded()
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
+        guard let row = descendants(host).compactMap({ $0 as? NativeGroupCard }).first(where: { !$0.isHidden }),
+              let viewport = row.superview else {
+            throw HomeScrollCheck.Failure("Could not lay out a native Genres row")
+        }
+        let location = viewport.convert(CGPoint(x: row.frame.minX + 18, y: row.frame.midY - 0.5), to: nil)
+        guard let event = NSEvent.mouseEvent(with: .mouseMoved,
+                  location: location,
+                  modifierFlags: [], timestamp: 0, windowNumber: 0,
+                  context: nil, eventNumber: 0, clickCount: 0, pressure: 0) else {
+            throw HomeScrollCheck.Failure("Could not create the Genres pointer event")
+        }
+        if capturesFrames {
+            let titleLocation = viewport.convert(CGPoint(x: row.frame.minX + 85, y: row.frame.midY - 0.5), to: nil)
+            try await verifyPresentedGenreHover(window: window, viewport: viewport, artwork: location, title: titleLocation)
+            return
+        }
+        window.pointer = location
+        viewport.mouseMoved(with: event)
+        let animations = viewport.subviews.last?.layer.map { layer in
+            (layer.animationKeys() ?? []).compactMap { layer.animation(forKey: $0) as? CABasicAnimation }
+        } ?? []
+        guard animations.contains(where: {
+            $0.keyPath == "opacity" && ($0.fromValue as? NSNumber)?.doubleValue == 0
+                && ($0.toValue as? NSNumber)?.doubleValue == 1 && $0.duration > 0
+        }) else {
+            throw HomeScrollCheck.Failure("The Genres Play overlay appeared without an opacity transition")
+        }
+    }
+
+    private static func verifyPresentedGenreHover(window: HoverCheckWindow, viewport: NSView,
+                                                  artwork: NSPoint, title: NSPoint) async throws {
+        let content = try await SCShareableContent.currentProcess
+        guard let target = content.windows.first(where: { $0.windowID == CGWindowID(window.windowNumber) }) else {
+            throw HomeScrollCheck.Failure("The Genres test window was not available for capture")
+        }
+        let filter = SCContentFilter(desktopIndependentWindow: target)
+        let configuration = SCStreamConfiguration()
+        configuration.width = Int(window.frame.width)
+        configuration.height = Int(window.frame.height)
+        configuration.ignoreShadowsSingleWindow = true
+        configuration.showsCursor = false
+        let crop = CGRect(x: artwork.x.rounded() - 6,
+                          y: window.frame.height - artwork.y.rounded() - 6, width: 13, height: 13)
+
+        func move(_ point: NSPoint) throws {
+            guard let event = NSEvent.mouseEvent(with: .mouseMoved, location: point, modifierFlags: [], timestamp: 0,
+                                                windowNumber: window.windowNumber, context: nil, eventNumber: 0,
+                                                clickCount: 0, pressure: 0) else {
+                throw HomeScrollCheck.Failure("Could not create the pointer movement")
+            }
+            window.pointer = point
+            viewport.mouseMoved(with: event)
+        }
+
+        func capture() async throws -> [Double] {
+            let frame = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
+            guard let region = frame.cropping(to: crop),
+                  let context = CGContext(data: nil, width: region.width, height: region.height, bitsPerComponent: 8,
+                                          bytesPerRow: region.width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+                  let pixels = context.data?.assumingMemoryBound(to: UInt8.self) else {
+                throw HomeScrollCheck.Failure("Could not read the artwork pixels from the presented window")
+            }
+            context.draw(region, in: CGRect(x: 0, y: 0, width: region.width, height: region.height))
+            return (0..<(region.width * region.height)).map { index in
+                let offset = index * 4
+                return Double(Int(pixels[offset]) + Int(pixels[offset + 1]) + Int(pixels[offset + 2])) / 765
+            }
+        }
+
+        func transition(to point: NSPoint) async throws -> [[Double]] {
+            try move(point)
+            let until = ContinuousClock.now + .milliseconds(420)
+            var frames: [[Double]] = []
+            repeat {
+                frames.append(try await capture())
+                try await Task.sleep(for: .milliseconds(8))
+            } while ContinuousClock.now < until
+            return frames
+        }
+
+        try await Task.sleep(for: .milliseconds(180))
+        let resting = try await capture()
+        let entering = try await transition(to: artwork)
+        let leavingArtwork = try await transition(to: title)
+        let reentering = try await transition(to: artwork)
+        let leavingRow = try await transition(to: CGPoint(x: -100, y: -100))
+        let shown = entering.last ?? resting
+        let glyph = resting.indices.filter { shown[$0] - resting[$0] > 0.23 }
+        guard glyph.count >= 6 else { throw HomeScrollCheck.Failure("Play did not appear in the captured window") }
+        let scale = glyph.reduce(0) { $0 + shown[$1] - resting[$1] }
+        let transitions = [("enter row at artwork", entering), ("leave artwork for title", leavingArtwork),
+                           ("enter artwork from title", reentering), ("leave row", leavingRow)]
+        var allAnimated = true
+        for (name, frames) in transitions {
+            let progress = frames.map { frame in glyph.reduce(0) { $0 + frame[$1] - resting[$1] } / scale }
+            let intermediate = progress.filter { (0.14...0.86).contains($0) }.count
+            print("Genres \(name): \(progress.map { Int(($0 * 100).rounded()) })")
+            allAnimated = allAnimated && intermediate >= 2
+        }
+        guard allAnimated else { throw HomeScrollCheck.Failure("A presented Play transition skipped its intermediate frames") }
+    }
+
+    private static func verifyAudioInfoSpectrumTiming() async throws {
+        let url = BenchmarkPaths.scratch.appending(path: "spectrum-\(UUID().uuidString).caf")
+        let format = PCMStreamFormat.format
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 48_000)!
+        buffer.frameLength = buffer.frameCapacity
+        let channels = buffer.floatChannelData!
+        for frame in 0..<Int(buffer.frameLength) {
+            let frequency: Float = (7500..<8192).contains(frame) ? 1000 : 0
+            let level: Float = 0.5 * sin(2 * Float.pi * frequency * Float(frame) / 48_000)
+            channels[0][frame] = level
+            channels[1][frame] = -level
+        }
+        do {
+            var settings = format.settings
+            settings[AVLinearPCMIsNonInterleaved] = false
+            let file = try AVAudioFile(forWriting: url, settings: settings)
+            try file.write(from: buffer)
+        }
+
+        let playback = try PCMPlayback(mode: .offline)
+        let source = PCMPlayback.Source(id: UUID(), url: url, lease: nil)
+        playback.begin(source, position: 0, play: true)
+        for _ in 0..<200 {
+            playback.poll()
+            if playback.readyForOfflineRender { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        guard playback.readyForOfflineRender else {
+            throw HomeScrollCheck.Failure("Spectrum fixture did not start")
+        }
+        for _ in 0..<64 {
+            _ = try playback.render(128)
+            playback.poll()
+        }
+        playback.setAudioInfoSpectrumEnabled(true)
+        let levels = playback.audioInfoSpectrum()
+        guard levels.count == 16, levels[7] > 0.75,
+              levels[7] == levels.max(), levels[7] - levels[15] > 0.4 else {
+            throw HomeScrollCheck.Failure("Audio info did not read the scheduled tone at the playback position: \(levels)")
+        }
+        playback.begin(source, position: 0.4, play: true)
+        guard playback.audioInfoSpectrum().allSatisfy({ $0 == 0 }) else {
+            throw HomeScrollCheck.Failure("Audio info retained the previous spectrum after seeking")
+        }
+    }
+
+    private static func verifyAudioInfoSpectrumAtHighSampleRate() throws {
+        let sampleRate = 96_000.0
+        let analyzer = AudioInfoSpectrum(sampleRate: sampleRate)
+        let levels = analyzer.read { left, right in
+            for index in left.indices {
+                let value = 0.5 * sin(2 * Float.pi * 72 * Float(index) / Float(sampleRate))
+                left[index] = value
+                right[index] = -value
+            }
+            return .samples(frame: 96_000, sampleRate: sampleRate)
+        }
+        guard levels.count == 16, levels[0] > 0.75, levels[0] == levels.max() else {
+            throw HomeScrollCheck.Failure("Audio info lost the bass band at 96 kHz: \(levels)")
+        }
+    }
+
     private static func verifyAudioInfoSpectrumWidth() throws {
         for scale: CGFloat in [1, 2] {
             let quiet = try spectrumBarPixels(heights: Array(repeating: 3.9255, count: 16), scale: scale)
             let varying = try spectrumBarPixels(heights: (0..<16).map { 3.9255 + 17 * CGFloat($0) / 15 }, scale: scale)
             let widths = quiet.map(\.width) + varying.map(\.width)
+            let gaps = [quiet, varying].flatMap { bars in
+                zip(bars, bars.dropFirst()).map { left, right in right.start - left.start - left.width }
+            }
             guard quiet.count == 16, varying.count == 16, Set(widths).count == 1,
-                  varying[15].height > quiet[15].height * 2 else {
-                throw HomeScrollCheck.Failure("Audio info spectrum widths or heights differ from expectations at \(scale)×: \(widths)")
+                  Set(gaps).count == 1, varying[15].height > quiet[15].height * 2 else {
+                throw HomeScrollCheck.Failure("Audio info spectrum dimensions differ at \(scale)×: widths \(widths), gaps \(gaps)")
             }
         }
     }
 
-    private static func spectrumBarPixels(heights: [CGFloat], scale: CGFloat) throws -> [(width: Int, height: Int)] {
+    private static func spectrumBarPixels(heights: [CGFloat], scale: CGFloat) throws -> [(start: Int, width: Int, height: Int)] {
         let renderer = ImageRenderer(content: AudioInfoSpectrumBars(heights: heights, width: 105, peakHeight: 21)
             .foregroundStyle(.white).environment(\.displayScale, scale))
         renderer.scale = scale
@@ -512,16 +820,17 @@ enum PerformanceProbe {
             throw HomeScrollCheck.Failure("Could not render Audio info spectrum")
         }
         context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
-        var bars: [(width: Int, height: Int)] = []
-        var run = (width: 0, height: 0)
+        var bars: [(start: Int, width: Int, height: Int)] = []
+        var run = (start: 0, width: 0, height: 0)
         for x in 0..<image.width {
             let height = (0..<image.height).count { bytes[$0 * context.bytesPerRow + x * 4 + 3] >= 128 }
             if height > 0 {
+                if run.width == 0 { run.start = x }
                 run.width += 1
                 run.height = max(run.height, height)
             } else if run.width > 0 {
                 bars.append(run)
-                run = (0, 0)
+                run = (0, 0, 0)
             }
         }
         if run.width > 0 { bars.append(run) }

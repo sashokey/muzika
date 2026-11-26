@@ -17,7 +17,7 @@ nonisolated struct LyricsScrollGeometry: Sendable {
     init(heights: [CGFloat], spacing: CGFloat, viewportHeight: CGFloat, topOverflow: CGFloat, hasLeadingGap: Bool) {
         self.heights = heights
         self.viewportHeight = viewportHeight
-        anchor = max(0, (viewportHeight + topOverflow) * 0.36 - topOverflow)
+        anchor = Self.lineAnchor(viewportHeight: viewportHeight, topOverflow: topOverflow)
         gapExtent = 28 + spacing
         topInset = anchor + (hasLeadingGap ? gapExtent : 0)
         bottomInset = max(0, viewportHeight - anchor - topOverflow)
@@ -27,6 +27,10 @@ nonisolated struct LyricsScrollGeometry: Sendable {
             return next
         }
         rowsHeight = heights.isEmpty ? 0 : next - spacing
+    }
+
+    static func lineAnchor(viewportHeight: CGFloat, topOverflow: CGFloat) -> CGFloat {
+        max(0, (viewportHeight + topOverflow) * 0.36 - topOverflow)
     }
 
     func contentHeight(gapBefore: Int?) -> CGFloat {

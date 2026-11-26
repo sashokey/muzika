@@ -325,15 +325,18 @@ private final class InstrumentalTransitionCheck: NSObject, NSApplicationDelegate
         let document = LyricsDocument(lines: (0..<50).map {
             LyricsLine(id: $0, text: "Untimed lyric \($0)", start: nil, end: nil)
         })
+        let topOverflow: CGFloat = 36
         func panel(position: Double, autoScroll: Bool) -> some View {
             LyricsPanel(document: document, position: { position }, playing: false, offset: 0, textSize: 1,
                         blur: false, highlighting: .progressive, automaticallyScrollsUntimedLyrics: autoScroll,
-                        seek: { _ in }, duration: 1)
+                        seek: { _ in }, topOverflow: topOverflow, duration: 1)
                 .environment(\.scenePhase, .active)
+                .environment(\.colorScheme, .dark)
+                .background(.black)
         }
         let window = CheckPanel(contentRect: CGRect(x: 0, y: 0, width: 460, height: 400),
                                 styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
-        let host = NSHostingView(rootView: panel(position: 0.25, autoScroll: true))
+        let host = NSHostingView(rootView: panel(position: 0, autoScroll: true))
         window.contentView = host
         window.setContentSize(NSSize(width: 460, height: 400))
         defer { window.contentView = nil }
@@ -358,6 +361,22 @@ private final class InstrumentalTransitionCheck: NSObject, NSApplicationDelegate
             throw Failure(description: "Untimed lyrics did not scroll to \(fraction)")
         }
 
+        let startScroll = try await waitForScroll(to: 0)
+        let bounds = startScroll.convert(startScroll.bounds, to: host)
+        let bitmap = try require(host.bitmapImageRepForCachingDisplay(in: bounds), "Could not rasterize untimed lyrics")
+        host.cacheDisplay(in: bounds, to: bitmap)
+        let scale = CGFloat(bitmap.pixelsHigh) / bounds.height
+        let firstInk = (0..<bitmap.pixelsHigh).first { y in
+            stride(from: 0, to: bitmap.pixelsWide, by: 4).contains { x in
+                guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { return false }
+                return min(color.redComponent, color.greenComponent, color.blueComponent) >= 0.65
+            }
+        }
+        let firstY = CGFloat(try require(firstInk, "Untimed lyric ink was missing")) / scale
+        let anchor = (startScroll.contentSize.height + topOverflow) * 0.36 - topOverflow
+        try expect(abs(firstY - anchor) <= 18, "Untimed lyrics start at \(firstY) pt instead of the timed anchor at \(anchor) pt")
+
+        host.rootView = panel(position: 0.25, autoScroll: true)
         _ = try await waitForScroll(to: 0.25)
         host.rootView = panel(position: 0.25, autoScroll: false)
         let scroll = try await waitForScroll(to: 0.25)
@@ -372,6 +391,8 @@ private final class InstrumentalTransitionCheck: NSObject, NSApplicationDelegate
                    "Disabling untimed auto-scroll must preserve the manually scrolled position after a seek")
         host.rootView = panel(position: 0.75, autoScroll: true)
         _ = try await waitForScroll(to: 0.75)
+        host.rootView = panel(position: 1, autoScroll: true)
+        _ = try await waitForScroll(to: 1)
     }
 
     private func screenY(_ layer: CALayer, tiles: CALayer, view: TimedLyricsScrollView, presented: Bool = false) -> CGFloat {

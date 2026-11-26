@@ -52,7 +52,7 @@ struct BrowseTrackRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            BrowseArtwork(library: library, track: track, pixelSize: 96)
+            BrowseArtwork(library: library, track: track, pixelSize: BrowseArtwork.smallThumbnailPixels)
                 .frame(width: 36, height: 36)
             VStack(alignment: .leading, spacing: 3) {
                 Text(track.title).fontWeight(.medium).lineLimit(1)

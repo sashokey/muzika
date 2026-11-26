@@ -1,6 +1,6 @@
 {
-  "version": "v16",
+  "version": "v17",
   "draft": false,
   "prerelease": false,
-  "notes": "- Scanning a local music folder skips protected Apple Music library data, preventing the macOS Media & Apple Music permission prompt.\n- Home uses a softer animated glow for **Shuffle** and avoids clipping the glow when it fits in the available space.\n- Improved scrolling in **Folders** and untimed **Lyrics**, and reduced work when displaying and reordering large **Up Next** queues.\n\nThe Home frame-rate target still needs verification with the animation visible.\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
+  "notes": "- **Audio info** follows the playback clock, with more contrast between frequency bands and even gaps between bars.\n- The **Play** button in **Genres** fades in and out when you move the pointer onto or off the artwork.\n- **Up Next** uses the same miniature spectrum indicator as **Songs** and removes stray pixels beside its list headers.\n- Compact cover thumbnails share an 88 px cache. **Songs** uses a separate 44 px thumbnail size.\n- In **Lyrics**, untimed text starts scrolling at the same height as the active line of timed lyrics.\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
 }

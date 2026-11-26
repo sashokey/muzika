@@ -293,6 +293,7 @@ struct NowPlayingView: View {
                 .ignoresSafeArea(.container, edges: .bottom)
         case .queue:
             QueuePanel(playback: state.playback, library: state.library)
+                .environment(\.libraryPlaybackEffectsVisible, visibleWindow)
                 .padding(.top, 15 + (fullscreenTopPadding ?? 0))
                 .padding(.bottom, 15 + panelControlsHeight + 8)
         }
@@ -361,6 +362,7 @@ private struct QueuePanel: View {
     @Bindable var playback: PlaybackController
     let library: LibraryStore
     @Environment(\.layoutDirection) private var layoutDirection
+    @Environment(\.pixelLength) private var pixelLength
     @ScaledMetric(relativeTo: .caption) private var headerHeight = 28.0
     @State private var artworkPage = 0
 
@@ -391,7 +393,7 @@ private struct QueuePanel: View {
                         Section {
                             QueueTrackLabel(
                                 library: library, track: current,
-                                symbol: playback.playing ? "speaker.wave.2.fill" : "pause.fill"
+                                currentPlayback: playback
                             )
                                 .id(playback.currentEntryID)
                         } header: {
@@ -515,7 +517,7 @@ private struct QueuePanel: View {
             await withTaskGroup(of: Void.self) { group in
                 for track in tracks[start..<min(start + 4, tracks.count)] {
                     group.addTask {
-                        _ = await BrowseArtwork.loadThumbnail(for: track, in: library, pixelSize: QueueTrackLabel.artworkPixels)
+                        _ = await BrowseArtwork.loadThumbnail(for: track, in: library, pixelSize: BrowseArtwork.smallThumbnailPixels)
                     }
                 }
             }
@@ -535,7 +537,7 @@ private struct QueuePanel: View {
                 Rectangle()
                     .fill(.black)
                     .padding(.vertical, -4)
-                    .padding(.horizontal, -8)
+                    .padding(.horizontal, -8 - pixelLength)
                     .blendMode(.destinationOut)
             }
     }
@@ -570,22 +572,22 @@ private struct QueueTrackRow: View {
 }
 
 private struct QueueTrackLabel: View {
-    static let artworkPixels = 88
-
     let library: LibraryStore
     let track: AudioTrack
-    var symbol: String?
+    var currentPlayback: PlaybackController?
 
     var body: some View {
         HStack(spacing: 10) {
-            BrowseArtwork(library: library, track: track, pixelSize: Self.artworkPixels, cornerRadius: 4)
+            BrowseArtwork(library: library, track: track, pixelSize: BrowseArtwork.smallThumbnailPixels, cornerRadius: 4)
                 .frame(width: 34, height: 34)
             VStack(alignment: .leading, spacing: 3) {
                 Text(track.title).font(.subheadline.weight(.medium)).lineLimit(1)
                 Text(track.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
-            if let symbol { Image(systemName: symbol).foregroundStyle(Color.accentColor) }
+            if let currentPlayback {
+                ArtworkSpectrumBadge(playback: currentPlayback, diameter: 18, style: .songs)
+            }
             Text(elapsedLabel(track.duration)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
         }
         .contentShape(Rectangle())

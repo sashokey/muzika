@@ -68,7 +68,9 @@ final class NativeGroupCard: NSButton {
         if self.frame != frame { self.frame = frame }
         setAccessibilityLabel(group.title)
         setAccessibilityHelp(group.subtitle)
-        let pixels = presentation == .list ? 96 : min(320, max(96, Int(ceil(frame.width * displayScale / 32)) * 32))
+        let pixels = presentation == .list
+            ? BrowseArtwork.smallThumbnailPixels
+            : min(320, max(96, Int(ceil(frame.width * displayScale / 32)) * 32))
         updateThumbnail(track: group.artworkTrack, library: library, pixels: pixels)
         updateLayers()
     }

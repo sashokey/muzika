@@ -34,6 +34,8 @@ protocol PlaybackTransport: AnyObject {
     func refreshSuccessor()
     func setSpectrumEnabled(_ enabled: Bool)
     func spectrum() -> [Float]
+    func setAudioInfoSpectrumEnabled(_ enabled: Bool)
+    func audioInfoSpectrum() -> [Float]
 }
 
 @MainActor
@@ -72,6 +74,7 @@ final class PlaybackController {
     @ObservationIgnored private var pendingListen = 0.0
     @ObservationIgnored private var lastAutosave = ContinuousClock.now
     @ObservationIgnored private var spectrumClients: Set<UUID> = []
+    @ObservationIgnored private var audioInfoSpectrumClients: Set<UUID> = []
     @ObservationIgnored private var didDismiss = false
     @ObservationIgnored private var reportedRendering = false
 
@@ -225,7 +228,7 @@ final class PlaybackController {
             } else {
                 playbackError = nil
                 playing = true
-                transport?.setSpectrumEnabled(wantsSpectrum)
+                updateSpectrumRequests()
                 transport?.play()
                 startTicker()
                 notifyNowPlaying()
@@ -422,18 +425,31 @@ final class PlaybackController {
         }
     }
 
-    private var wantsSpectrum: Bool { !spectrumClients.isEmpty }
-
     func setSpectrumEnabled(_ enabled: Bool, from client: UUID) {
-        let wasEnabled = wantsSpectrum
         if enabled { spectrumClients.insert(client) }
         else { spectrumClients.remove(client) }
-        if wasEnabled != wantsSpectrum { transport?.setSpectrumEnabled(wantsSpectrum && playing) }
+        updateSpectrumRequests()
     }
 
     func spectrum() -> [Float] {
         guard playing, let transport else { return [] }
         return transport.spectrum()
+    }
+
+    func setAudioInfoSpectrumEnabled(_ enabled: Bool, from client: UUID) {
+        if enabled { audioInfoSpectrumClients.insert(client) }
+        else { audioInfoSpectrumClients.remove(client) }
+        updateSpectrumRequests()
+    }
+
+    func audioInfoSpectrum() -> [Float] {
+        guard playing, let transport else { return [] }
+        return transport.audioInfoSpectrum()
+    }
+
+    private func updateSpectrumRequests() {
+        transport?.setSpectrumEnabled(playing && !spectrumClients.isEmpty)
+        transport?.setAudioInfoSpectrumEnabled(playing && !audioInfoSpectrumClients.isEmpty)
     }
 
     func renderOffline() throws -> Bool {
@@ -505,9 +521,9 @@ final class PlaybackController {
     private func pause() {
         guard playing else { return }
         transport?.pause()
-        transport?.setSpectrumEnabled(false)
         position = livePosition
         playing = false
+        updateSpectrumRequests()
         flushHistory()
         saveSession()
         notifyNowPlaying()
@@ -567,7 +583,7 @@ final class PlaybackController {
                 }
                 playing = true
                 engine.begin(source, position: position, play: true)
-                engine.setSpectrumEnabled(wantsSpectrum)
+                updateSpectrumRequests()
                 startTicker()
             } catch {
                 report(error, id: entry.id)
@@ -647,7 +663,7 @@ final class PlaybackController {
         flushHistory()
         position = boundedPosition(transport?.livePosition ?? current?.duration ?? position)
         playing = false
-        transport?.setSpectrumEnabled(false)
+        updateSpectrumRequests()
         endedOccurrence = true
         saveSession()
         notifyNowPlaying()

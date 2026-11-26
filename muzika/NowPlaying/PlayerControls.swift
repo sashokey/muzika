@@ -13,7 +13,7 @@ struct PlayerCapsule: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Button(action: state.showPlayer) {
                         HStack(spacing: 8) {
-                            PlayingCover(library: state.library, track: track, maxPixels: 96)
+                            PlayingCover(library: state.library, track: track, maxPixels: BrowseArtwork.smallThumbnailPixels)
                                 .frame(width: 33, height: 33)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(track.title).font(.subheadline.weight(.semibold)).lineLimit(1)
@@ -229,7 +229,10 @@ struct PlayingCover: View {
         }
         .task(id: track.id) {
             cover = nil
-            if let data = await library.artwork(for: track) {
+            if maxPixels == BrowseArtwork.smallThumbnailPixels {
+                let image = await BrowseArtwork.loadThumbnail(for: track, in: library, pixelSize: maxPixels)
+                if !Task.isCancelled { cover = image }
+            } else if let data = await library.artwork(for: track) {
                 let image = await CoverDecoding.image(data, limit: maxPixels)
                 if !Task.isCancelled { cover = image }
             }

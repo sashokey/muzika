@@ -37,6 +37,8 @@ struct LyricsPanel: View {
         } else {
             GeometryReader { geometry in
                 let typography = LyricsTypography(width: geometry.size.width, scale: textSize)
+                let startAnchor = LyricsScrollGeometry.lineAnchor(viewportHeight: geometry.size.height,
+                                                                  topOverflow: topOverflow)
                 let request = document.lines.count > 200 && !voiceOver && incompatibleLines != document.lines
                     ? UntimedLayoutRequest(lines: document.lines, typography: typography) : nil
                 let measurement = request.flatMap { request in
@@ -51,6 +53,7 @@ struct LyricsPanel: View {
                     .frame(width: layout == nil ? nil : displayedTypography.containerWidth)
                     .frame(maxWidth: displayedTypography.containerWidth)
                     .frame(maxWidth: .infinity)
+                    .padding(.top, startAnchor)
                     .padding(.bottom, bottomClearance)
                     .background {
                         if automaticallyScrollsUntimedLyrics {
@@ -67,7 +70,7 @@ struct LyricsPanel: View {
                 .scrollIndicators(.never, axes: .vertical)
                 .scrollClipDisabled(topOverflow > 0)
                 .onScrollGeometryChange(for: Range<Int>.self) { scroll in
-                    layout?.rows(covering: scroll.visibleRect) ?? 0..<0
+                    layout?.rows(covering: scroll.visibleRect.offsetBy(dx: 0, dy: -startAnchor)) ?? 0..<0
                 } action: { _, rows in
                     visibleRows = rows
                 }

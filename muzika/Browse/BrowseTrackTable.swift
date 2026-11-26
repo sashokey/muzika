@@ -82,7 +82,8 @@ struct BrowseTrackTable: View {
     private func trackArtwork(_ track: AudioTrack, in rows: [AudioTrack]) -> some View {
         let size = ArtworkPlaybackLayout.songArtworkSize
         let artwork = BrowseArtwork(
-            library: library, track: track, pixelSize: 64,
+            library: library, track: track,
+            pixelSize: usesSongsArtwork ? BrowseArtwork.songThumbnailPixels : BrowseArtwork.smallThumbnailPixels,
             cornerRadius: usesSongsArtwork ? 2 : BrowseArtwork.defaultCornerRadius
         )
         .frame(width: size, height: size)

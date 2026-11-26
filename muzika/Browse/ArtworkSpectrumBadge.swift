@@ -103,7 +103,9 @@ struct ArtworkSpectrumBadge: View {
             return
         }
         let client = UUID()
-        playback.setSpectrumEnabled(true, from: client)
+        let audioInfo = style == .audioInfo
+        if audioInfo { playback.setAudioInfoSpectrumEnabled(true, from: client) }
+        else { playback.setSpectrumEnabled(true, from: client) }
         #if MUZIKA_DEV_LOGS
         var lastSpectrumReport = -Double.infinity
         if style == .audioInfo {
@@ -114,10 +116,22 @@ struct ArtworkSpectrumBadge: View {
             if style == .audioInfo { MuzikaTrace.event(.controls, "spectrum.stop") }
         }
         #endif
-        defer { playback.setSpectrumEnabled(false, from: client) }
+        defer {
+            if audioInfo { playback.setAudioInfoSpectrumEnabled(false, from: client) }
+            else { playback.setSpectrumEnabled(false, from: client) }
+        }
+        let clock = ContinuousClock()
+        let interval: Duration = audioInfo ? .nanoseconds(16_666_667) : .milliseconds(85)
         while !Task.isCancelled {
-            let spectrum = playback.spectrum()
-            let next = spectrum.isEmpty ? restingLevels : Self.bands(from: spectrum, count: restingLevels.count)
+            let deadline = clock.now + interval
+            let spectrum = audioInfo ? playback.audioInfoSpectrum() : playback.spectrum()
+            let next: [CGFloat] = if spectrum.isEmpty {
+                restingLevels
+            } else if audioInfo {
+                spectrum.map { Self.minimumSpectrumLevel + (1 - Self.minimumSpectrumLevel) * CGFloat($0) }
+            } else {
+                Self.bands(from: spectrum)
+            }
             #if MUZIKA_DEV_LOGS
             let now = ProcessInfo.processInfo.systemUptime
             if style == .audioInfo, now - lastSpectrumReport >= 1 {
@@ -127,9 +141,10 @@ struct ArtworkSpectrumBadge: View {
             }
             #endif
             if levels != next {
-                withAnimation(.easeInOut(duration: 0.14)) { levels = next }
+                if audioInfo { levels = next }
+                else { withAnimation(.easeInOut(duration: 0.14)) { levels = next } }
             }
-            do { try await Task.sleep(for: .milliseconds(85)) }
+            do { try await clock.sleep(until: audioInfo ? deadline : clock.now + interval) }
             catch { return }
         }
     }
@@ -143,16 +158,18 @@ struct AudioInfoSpectrumBars: View {
     @Environment(\.pixelLength) private var pixelLength
 
     var body: some View {
-        let column = width / CGFloat(heights.count)
-        let barWidth = max(pixelLength, (column * 0.5 / pixelLength).rounded() * pixelLength)
+        let count = CGFloat(max(1, heights.count))
+        let totalPixels = (width / pixelLength).rounded(.down)
+        let barPixels = max(1, (totalPixels / (count * 2)).rounded())
+        let pitch = max(0, (totalPixels - barPixels) / max(1, count - 1)).rounded(.down)
+        let leading = ((totalPixels - barPixels - pitch * (count - 1)) * 0.5).rounded(.down)
         return ZStack {
             ForEach(heights.indices, id: \.self) { index in
-                let left = (CGFloat(index) + 0.5) * column - barWidth * 0.5
-                let alignedLeft = (left / pixelLength).rounded() * pixelLength
                 Capsule()
                     .fill(.foreground)
-                    .frame(width: barWidth, height: heights[index])
-                    .position(x: alignedLeft + barWidth * 0.5, y: peakHeight * 0.5)
+                    .frame(width: barPixels * pixelLength, height: heights[index])
+                    .position(x: (leading + CGFloat(index) * pitch + barPixels * 0.5) * pixelLength,
+                              y: peakHeight * 0.5)
             }
         }
         .frame(width: width, height: peakHeight)

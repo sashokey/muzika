@@ -414,6 +414,8 @@ enum AlbumCompleteness: String, CaseIterable {
 struct BrowseArtwork: View {
     static let cardHoverOutset = CGSize(width: 4, height: 3)
     static let defaultCornerRadius: CGFloat = 9
+    static let smallThumbnailPixels = 88
+    static let songThumbnailPixels = Int(ArtworkPlaybackLayout.songArtworkSize * 2)
 
     let library: LibraryStore
     let track: AudioTrack?
@@ -425,32 +427,40 @@ struct BrowseArtwork: View {
     @State private var thumbnail: Thumbnail?
 
     private struct Thumbnail {
-        let trackID: String
+        let key: String
         let image: CGImage
     }
 
-    private static let cache: NSCache<NSString, CGImage> = {
+    private static let cache = makeCache(mebibytes: 20)
+    private static let songCache = makeCache(mebibytes: 4)
+
+    private static func makeCache(mebibytes: Int) -> NSCache<NSString, CGImage> {
         let cache = NSCache<NSString, CGImage>()
-        cache.totalCostLimit = 24 * 1024 * 1024
+        cache.totalCostLimit = mebibytes * 1024 * 1024
         return cache
-    }()
+    }
+
+    private static func cache(for pixelSize: Int) -> NSCache<NSString, CGImage> {
+        pixelSize == songThumbnailPixels ? songCache : cache
+    }
 
     static func cachedThumbnail(for track: AudioTrack, pixelSize: Int) -> CGImage? {
-        cache.object(forKey: "\(pixelSize):\(track.id)" as NSString)
+        cache(for: pixelSize).object(forKey: "\(pixelSize):\(track.id)" as NSString)
     }
 
     static func loadThumbnail(for track: AudioTrack, in library: LibraryStore, pixelSize: Int) async -> CGImage? {
         if let cached = cachedThumbnail(for: track, pixelSize: pixelSize) { return cached }
         guard let data = await library.artwork(for: track), !Task.isCancelled,
               let image = await CoverDecoding.image(data, limit: pixelSize), !Task.isCancelled else { return nil }
-        cache.setObject(image, forKey: "\(pixelSize):\(track.id)" as NSString, cost: image.bytesPerRow * image.height)
+        cache(for: pixelSize).setObject(image, forKey: "\(pixelSize):\(track.id)" as NSString,
+                                      cost: image.bytesPerRow * image.height)
         return image
     }
 
     var body: some View {
-        let localImage = thumbnail?.trackID == track?.id ? thumbnail?.image : nil
-        let currentImage = localImage ?? track.flatMap { Self.cachedThumbnail(for: $0, pixelSize: pixelSize) }
         let key = track.map { "\(pixelSize):\($0.id)" }
+        let localImage = thumbnail?.key == key ? thumbnail?.image : nil
+        let currentImage = localImage ?? track.flatMap { Self.cachedThumbnail(for: $0, pixelSize: pixelSize) }
         let outline = RoundedRectangle(cornerRadius: circular ? 512 : cornerRadius)
         Color(nsColor: .controlBackgroundColor)
             .aspectRatio(1, contentMode: .fit)
@@ -472,9 +482,9 @@ struct BrowseArtwork: View {
             }
             .accessibilityHidden(true)
             .task(id: key, priority: .utility) {
-                guard let track, let image = await Self.loadThumbnail(for: track, in: library, pixelSize: pixelSize),
+                guard let key, let track, let image = await Self.loadThumbnail(for: track, in: library, pixelSize: pixelSize),
                       !Task.isCancelled else { return }
-                thumbnail = Thumbnail(trackID: track.id, image: image)
+                thumbnail = Thumbnail(key: key, image: image)
             }
             .onDisappear { thumbnail = nil }
     }
