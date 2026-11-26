@@ -41,6 +41,7 @@
 "Audio info, %@" = "Ses bilgileri, %@";
 "Audio quality" = "Ses kalitesi";
 "Auto Scan" = "Otomatik tarama";
+"Auto-scroll untimed lyrics" = "Zaman damgası olmayan şarkı sözlerini otomatik kaydır";
 "Back" = "Geri";
 "Backing vocals. Seeks to this line." = "Vokal eşliği. Bu satıra atlar.";
 "Bit Depth" = "Bit derinliği";
@@ -256,7 +257,9 @@
 "Select a settings category." = "Bir ayar kategorisi seçin.";
 "Settings" = "Ayarlar";
 "Show" = "Göster";
+"Show album in Now Playing" = "Şu an çalınan ekranında albümü göster";
 "Show in Finder" = "Finder’da göster";
+"Show release year in Now Playing" = "Şu an çalınan ekranında çıkış yılını göster";
 "Show unreadable files" = "Okunamayan dosyaları göster";
 "Shuffle" = "Karıştır";
 "Sidebar" = "Kenar çubuğu";

@@ -1,5 +1,6 @@
 import AppKit
 import QuartzCore
+import SwiftUI
 
 @MainActor
 private final class CheckPanel: NSPanel {
@@ -71,7 +72,7 @@ private final class InstrumentalTransitionCheck: NSObject, NSApplicationDelegate
             view.configure(TimedLyricsConfiguration(document: lyrics ?? document, position: { time },
                                                     pausedPosition: playing ? nil : time, playing: playing, offset: 0, textSize: 1, blur: false,
                                                     reduceMotion: reduceMotion, topOverflow: 0, seek: { _ in },
-                                                    animatesWordHighlighting: animatesWordHighlighting))
+                                                    highlighting: animatesWordHighlighting ? .progressive : .immediate))
         }
 
         for (time, index) in [(5.0, 0), (10.0, 2)] {
@@ -268,6 +269,26 @@ private final class InstrumentalTransitionCheck: NSObject, NSApplicationDelegate
         try expect(gradient == [1, 0.5, 0.46, 0.42], "Distant phrases should recede without changing cue selection")
         let rows = (tiles.sublayers ?? []).sorted { $0.frame.minY < $1.frame.minY }
         try expect(rows.count == 4, "Missing lyric rows in emphasis check")
+        let activeBlock = try require(rows[0].sublayers?.first, "Missing the active phrase")
+        let base = try require(activeBlock.sublayers?.first, "Missing the phrase text")
+        let fill = try require(activeBlock.sublayers?.last, "Missing the phrase fill")
+        let fillMask = try require(fill.mask as? CAShapeLayer, "Missing the phrase fill mask")
+        apply(0.25, lyrics: phrases)
+        let initialFill = try require(fillMask.path, "On must start filling the phrase at its cue")
+        apply(0.65, lyrics: phrases)
+        let laterFill = try require(fillMask.path, "On must fill the phrase as playback advances")
+        try expect(!fill.isHidden && initialFill.boundingBox.width > 0 &&
+                   laterFill.boundingBox.width > initialFill.boundingBox.width,
+                   "On must gradually fill an active line with line-level timing")
+        apply(0.65, lyrics: phrases, animatesWordHighlighting: false)
+        try expect(base.opacity == 1 && fill.isHidden && fillMask.path == nil,
+                   "Off must highlight the whole active line immediately at the same playback position")
+        apply(0.88, lyrics: phrases, animatesWordHighlighting: false)
+        try expect(base.opacity == 1 && fill.isHidden,
+                   "Off must keep the whole active line highlighted while position advances")
+        apply(0.88, lyrics: phrases)
+        try expect(base.opacity == 0.65 && !fill.isHidden && fillMask.path != nil,
+                   "On must restore progress for the current line at the same playback position")
         let ink = try require(rows[1].sublayers?.first, "Missing primary lyric ink")
         try expect(ink.transform.m11 < 1, "An upcoming line without word timings should be slightly smaller")
         apply(0.96, lyrics: phrases, playing: true)
@@ -297,6 +318,60 @@ private final class InstrumentalTransitionCheck: NSObject, NSApplicationDelegate
         try expect(ink.animation(forKey: "lyrics-emphasis-scale") == nil, "Reduce Motion must stop the scale animation")
         try expect(rows.allSatisfy { $0.animation(forKey: "lyrics-row-stagger") == nil },
                    "Reduce Motion must stop the scroll stagger")
+        try await checkUntimedScroll()
+    }
+
+    private func checkUntimedScroll() async throws {
+        let document = LyricsDocument(lines: (0..<50).map {
+            LyricsLine(id: $0, text: "Untimed lyric \($0)", start: nil, end: nil)
+        })
+        func panel(position: Double, autoScroll: Bool) -> some View {
+            LyricsPanel(document: document, position: { position }, playing: false, offset: 0, textSize: 1,
+                        blur: false, highlighting: .progressive, automaticallyScrollsUntimedLyrics: autoScroll,
+                        seek: { _ in }, duration: 1)
+                .environment(\.scenePhase, .active)
+        }
+        let window = CheckPanel(contentRect: CGRect(x: 0, y: 0, width: 460, height: 400),
+                                styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
+        let host = NSHostingView(rootView: panel(position: 0.25, autoScroll: true))
+        window.contentView = host
+        window.setContentSize(NSSize(width: 460, height: 400))
+        defer { window.contentView = nil }
+
+        func findScroll(in view: NSView) -> NSScrollView? {
+            (view as? NSScrollView) ?? view.subviews.lazy.compactMap { findScroll(in: $0) }.first
+        }
+        func scrollOrigin(_ fraction: CGFloat, in clip: NSClipView) -> CGFloat {
+            let extent = clip.documentRect.height - clip.bounds.height
+            return clip.documentRect.minY + (clip.isFlipped ? fraction : 1 - fraction) * extent
+        }
+        func waitForScroll(to fraction: CGFloat) async throws -> NSScrollView {
+            for _ in 0..<40 {
+                host.layoutSubtreeIfNeeded()
+                if let scroll = findScroll(in: host) {
+                    let clip = scroll.contentView
+                    if clip.documentRect.height > clip.bounds.height,
+                       abs(clip.bounds.minY - scrollOrigin(fraction, in: clip)) < 1 { return scroll }
+                }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            throw Failure(description: "Untimed lyrics did not scroll to \(fraction)")
+        }
+
+        _ = try await waitForScroll(to: 0.25)
+        host.rootView = panel(position: 0.25, autoScroll: false)
+        let scroll = try await waitForScroll(to: 0.25)
+        let clip = scroll.contentView
+        let manualOrigin = scrollOrigin(0.4, in: clip)
+        clip.scroll(to: NSPoint(x: clip.bounds.minX, y: manualOrigin))
+        scroll.reflectScrolledClipView(clip)
+        host.rootView = panel(position: 0.75, autoScroll: false)
+        try await Task.sleep(for: .milliseconds(100))
+        host.layoutSubtreeIfNeeded()
+        try expect(abs(clip.bounds.minY - manualOrigin) < 1,
+                   "Disabling untimed auto-scroll must preserve the manually scrolled position after a seek")
+        host.rootView = panel(position: 0.75, autoScroll: true)
+        _ = try await waitForScroll(to: 0.75)
     }
 
     private func screenY(_ layer: CALayer, tiles: CALayer, view: TimedLyricsScrollView, presented: Bool = false) -> CGFloat {

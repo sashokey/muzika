@@ -1,6 +1,11 @@
 import AppKit
 import QuartzCore
 
+enum TimedLyricsHighlighting: Equatable {
+    case progressive
+    case immediate
+}
+
 struct TimedLyricsConfiguration {
     let document: LyricsDocument
     let position: @MainActor () -> Double
@@ -13,7 +18,9 @@ struct TimedLyricsConfiguration {
     let topOverflow: CGFloat
     let seek: @MainActor (Double) -> Void
     var duration: Double? = nil
-    var animatesWordHighlighting = true
+    var highlighting: TimedLyricsHighlighting = .progressive
+
+    var highlightsProgressively: Bool { highlighting == .progressive && !reduceMotion }
 }
 
 @MainActor
@@ -135,7 +142,9 @@ final class TimedLyricsScrollView: NSScrollView {
         if clipsToBounds != clips { clipsToBounds = clips }
         if contentView.clipsToBounds != clips { contentView.clipsToBounds = clips }
         updateLayout()
-        updateCue(force: old?.offset != next.offset || old?.reduceMotion != next.reduceMotion || old?.duration != next.duration)
+        let updatesCue = old?.offset != next.offset || old?.duration != next.duration ||
+            old?.reduceMotion != next.reduceMotion || old?.highlightsProgressively != next.highlightsProgressively
+        updateCue(force: updatesCue)
         if next.reduceMotion, motion != nil {
             center(animated: false)
         }
@@ -352,8 +361,8 @@ final class TimedLyricsScrollView: NSScrollView {
         let now = overrideTime ?? audioTime
         let delta = accentPosition.map { now - $0 }
         let isAdvancing = configuration.playing && delta != 0
-        let motion: LyricsAccentMotion = configuration.reduceMotion || !configuration.animatesWordHighlighting
-            ? .reduced : (isAdvancing ? .playing : .paused)
+        let motion: LyricsAccentMotion = configuration.highlightsProgressively
+            ? (isAdvancing ? .playing : .paused) : .immediate
         let reposition = force || (delta.map { $0 < 0 || $0 > 0.12 } ?? false)
         let refreshAccents = reposition || motion != accentMotion || (motion == .paused && delta != 0)
         accentPosition = now
@@ -474,7 +483,7 @@ final class TimedLyricsScrollView: NSScrollView {
         let singing = isSinging(line)
         let dimmed = focus != .row(index) && !singing
         let hasWords = !line.words.isEmpty || !line.pronunciationWords.isEmpty || !line.translationWords.isEmpty
-        let fillInterval = singing && focus == .row(index) && !configuration.reduceMotion && line.words.isEmpty
+        let fillInterval = singing && focus == .row(index) && configuration.highlightsProgressively && line.words.isEmpty
             ? configuration.document.fillInterval(for: line, until: configuration.duration.map { $0 - configuration.offset })
             : nil
         row.update(LyricsRowLayer.Appearance(singing: singing, dimmed: dimmed, idleOpacity: idleOpacity(for: index),

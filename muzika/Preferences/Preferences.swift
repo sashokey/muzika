@@ -41,6 +41,8 @@ enum PreferencesItem: String, CaseIterable, Identifiable {
     case heroAnimations = "Hero animations"
     case blurEffects = "Always use blur effects"
     case nowPlayingAudioSpectrum = "Now Playing audio spectrum"
+    case nowPlayingAlbum = "Show album in Now Playing"
+    case nowPlayingReleaseYear = "Show release year in Now Playing"
     case interfaceSize = "Interface size"
     case historyView = "History View"
     case continueListening = "Continue listening"
@@ -55,6 +57,7 @@ enum PreferencesItem: String, CaseIterable, Identifiable {
     case lyricsSize = "Lyrics text size"
     case lyricsBlur = "Lyrics blur"
     case animatedWordHighlighting = "Animated word highlighting"
+    case autoScrollUntimedLyrics = "Auto-scroll untimed lyrics"
     case lyricsTiming = "Lyrics timing"
     case defaultView = "Default view"
     case audioQuality = "Audio quality"
@@ -81,6 +84,8 @@ enum PreferencesItem: String, CaseIterable, Identifiable {
         case .heroAnimations: String(localized: "Hero animations")
         case .blurEffects: String(localized: "Always use blur effects")
         case .nowPlayingAudioSpectrum: String(localized: "Now Playing audio spectrum")
+        case .nowPlayingAlbum: String(localized: "Show album in Now Playing")
+        case .nowPlayingReleaseYear: String(localized: "Show release year in Now Playing")
         case .interfaceSize: String(localized: "Interface size")
         case .historyView: String(localized: "History View")
         case .continueListening: String(localized: "Continue listening")
@@ -95,6 +100,7 @@ enum PreferencesItem: String, CaseIterable, Identifiable {
         case .lyricsSize: String(localized: "Lyrics text size")
         case .lyricsBlur: String(localized: "Lyrics blur")
         case .animatedWordHighlighting: String(localized: "Animated word highlighting")
+        case .autoScrollUntimedLyrics: String(localized: "Auto-scroll untimed lyrics")
         case .lyricsTiming: String(localized: "Lyrics timing")
         case .defaultView: String(localized: "Default view")
         case .audioQuality: String(localized: "Audio quality")
@@ -118,12 +124,13 @@ enum PreferencesItem: String, CaseIterable, Identifiable {
 
     var page: PreferencesPage {
         switch self {
-        case .heroAnimations, .blurEffects, .nowPlayingAudioSpectrum, .interfaceSize, .historyView, .continueListening:
+        case .heroAnimations, .blurEffects, .nowPlayingAudioSpectrum, .nowPlayingAlbum, .nowPlayingReleaseYear,
+             .interfaceSize, .historyView, .continueListening:
             .appearance
         case .loudVolume, .loudVolumeThreshold, .gapless, .noDuplicates, .lockQueue, .spatialAudio,
              .coverArt, .listeningStatistics:
             .playback
-        case .lyricsSize, .lyricsBlur, .animatedWordHighlighting, .lyricsTiming:
+        case .lyricsSize, .lyricsBlur, .animatedWordHighlighting, .autoScrollUntimedLyrics, .lyricsTiming:
             .lyrics
         case .defaultView, .audioQuality, .songTap, .autoScan, .addFolder, .scanStatus, .scanLibrary, .forceScan,
              .cleanupMissing, .unreadableFiles, .clearLibrary:
@@ -238,6 +245,12 @@ final class Preferences {
     var showsNowPlayingAudioSpectrum: Bool {
         didSet { defaults.set(showsNowPlayingAudioSpectrum, forKey: "appearance.nowPlayingAudioSpectrum") }
     }
+    var showsNowPlayingAlbum: Bool {
+        didSet { defaults.set(showsNowPlayingAlbum, forKey: "appearance.nowPlayingAlbum") }
+    }
+    var showsNowPlayingReleaseYear: Bool {
+        didSet { defaults.set(showsNowPlayingReleaseYear, forKey: "appearance.nowPlayingReleaseYear") }
+    }
     var largerInterface: Bool {
         didSet { defaults.set(largerInterface, forKey: "appearance.largerInterface") }
     }
@@ -261,6 +274,9 @@ final class Preferences {
     }
     var animatesWordHighlighting: Bool {
         didSet { defaults.set(animatesWordHighlighting, forKey: "lyrics.animatesWordHighlighting") }
+    }
+    var automaticallyScrollsUntimedLyrics: Bool {
+        didSet { defaults.set(automaticallyScrollsUntimedLyrics, forKey: "lyrics.autoScrollUntimed") }
     }
     var lyricsOffset: Double {
         didSet { defaults.set(lyricsOffset, forKey: "lyrics.offset") }
@@ -291,6 +307,8 @@ final class Preferences {
         heroAnimations = defaults.object(forKey: "appearance.heroAnimations") as? Bool ?? true
         forceBlur = defaults.bool(forKey: "appearance.forceBlur")
         showsNowPlayingAudioSpectrum = defaults.object(forKey: "appearance.nowPlayingAudioSpectrum") as? Bool ?? true
+        showsNowPlayingAlbum = defaults.object(forKey: "appearance.nowPlayingAlbum") as? Bool ?? true
+        showsNowPlayingReleaseYear = defaults.object(forKey: "appearance.nowPlayingReleaseYear") as? Bool ?? true
         largerInterface = defaults.bool(forKey: "appearance.largerInterface")
         historyGrid = defaults.object(forKey: "appearance.historyGrid") as? Bool ?? true
         confirmLoudVolume = defaults.bool(forKey: "playback.confirmVolume")
@@ -299,6 +317,7 @@ final class Preferences {
         lyricsSize = defaults.object(forKey: "lyrics.size") as? Double ?? 1
         lyricsBlur = defaults.object(forKey: "lyrics.blur") as? Bool ?? true
         animatesWordHighlighting = defaults.object(forKey: "lyrics.animatesWordHighlighting") as? Bool ?? true
+        automaticallyScrollsUntimedLyrics = defaults.object(forKey: "lyrics.autoScrollUntimed") as? Bool ?? true
         lyricsOffset = defaults.object(forKey: "lyrics.offset") as? Double ?? 0
         defaultView = LibraryDefaultView(rawValue: defaults.string(forKey: "library.defaultView") ?? "") ?? .lastUsed
         audioQuality = QualityDisplay(rawValue: defaults.string(forKey: "library.audioQuality") ?? "") ?? .fileFormat

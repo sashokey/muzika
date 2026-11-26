@@ -41,6 +41,7 @@
 "Audio info, %@" = "音频信息，%@";
 "Audio quality" = "音质";
 "Auto Scan" = "自动扫描";
+"Auto-scroll untimed lyrics" = "自动滚动无时间戳的歌词";
 "Back" = "返回";
 "Backing vocals. Seeks to this line." = "伴唱。跳到这一句播放。";
 "Bit Depth" = "位深度";
@@ -256,7 +257,9 @@
 "Select a settings category." = "请选择设置类别。";
 "Settings" = "设置";
 "Show" = "显示";
+"Show album in Now Playing" = "在“正在播放”中显示专辑";
 "Show in Finder" = "在访达中显示";
+"Show release year in Now Playing" = "在“正在播放”中显示发行年份";
 "Show unreadable files" = "显示无法读取的文件";
 "Shuffle" = "随机播放";
 "Sidebar" = "边栏";

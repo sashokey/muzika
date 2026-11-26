@@ -41,6 +41,7 @@
 "Audio info, %@" = "오디오 정보, %@";
 "Audio quality" = "음질";
 "Auto Scan" = "자동 스캔";
+"Auto-scroll untimed lyrics" = "타임스탬프가 없는 가사 자동 스크롤";
 "Back" = "뒤로";
 "Backing vocals. Seeks to this line." = "백 보컬입니다. 이 줄의 재생 위치로 이동합니다.";
 "Bit Depth" = "비트 깊이";
@@ -256,7 +257,9 @@
 "Select a settings category." = "설정 카테고리를 선택하십시오.";
 "Settings" = "설정";
 "Show" = "보기";
+"Show album in Now Playing" = "지금 재생 중 화면에 앨범 표시";
 "Show in Finder" = "Finder에서 보기";
+"Show release year in Now Playing" = "지금 재생 중 화면에 발매 연도 표시";
 "Show unreadable files" = "읽을 수 없는 파일 보기";
 "Shuffle" = "임의 재생";
 "Sidebar" = "사이드바";

@@ -41,6 +41,7 @@
 "Audio info, %@" = "Сведения об аудио, %@";
 "Audio quality" = "Качество аудио";
 "Auto Scan" = "Автосканирование";
+"Auto-scroll untimed lyrics" = "Автопрокрутка текста без таймкодов";
 "Back" = "Назад";
 "Backing vocals. Seeks to this line." = "Бэк-вокал. Перейти к этой строке.";
 "Bit Depth" = "Разрядность";
@@ -256,7 +257,9 @@
 "Select a settings category." = "Выберите категорию настроек.";
 "Settings" = "Настройки";
 "Show" = "Показать";
+"Show album in Now Playing" = "Показывать альбом на экране «Сейчас играет»";
 "Show in Finder" = "Показать в Finder";
+"Show release year in Now Playing" = "Показывать год выпуска на экране «Сейчас играет»";
 "Show unreadable files" = "Показать нечитаемые файлы";
 "Shuffle" = "Перемешать";
 "Sidebar" = "Боковое меню";

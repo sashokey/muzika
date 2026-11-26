@@ -41,6 +41,7 @@
 "Audio info, %@" = "معلومات الصوت، ⁨%@⁩";
 "Audio quality" = "جودة الصوت";
 "Auto Scan" = "الفحص التلقائي";
+"Auto-scroll untimed lyrics" = "تمرير كلمات الأغنية غير المتزامنة تلقائيًا";
 "Back" = "رجوع";
 "Backing vocals. Seeks to this line." = "غناء مصاحب. ينقل التشغيل إلى هذا السطر.";
 "Bit Depth" = "عمق البت";
@@ -256,7 +257,9 @@
 "Select a settings category." = "يرجى اختيار فئة من الإعدادات";
 "Settings" = "الإعدادات";
 "Show" = "إظهار";
+"Show album in Now Playing" = "إظهار الألبوم في «قيد التشغيل»";
 "Show in Finder" = "إظهار في فايندر";
+"Show release year in Now Playing" = "إظهار سنة الإصدار في «قيد التشغيل»";
 "Show unreadable files" = "إظهار الملفات التي تتعذر قراءتها";
 "Shuffle" = "خلط";
 "Sidebar" = "الشريط الجانبي";

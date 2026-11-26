@@ -1,6 +1,6 @@
 {
-  "version": "v13",
+  "version": "v14",
   "draft": false,
   "prerelease": false,
-  "notes": "- Add **Animated word highlighting** in **Settings → Lyrics → Appearance**. Turn it off to highlight each timed word immediately.\n- Add **Now Playing audio spectrum** in **Settings → Appearance → Effects**. Turn it off to show the static waveform. **Audio info** and **Get Info** work in both modes.\n- Show the release year from track metadata in **Now Playing** when available.\n- Keep the spectrum bars a fixed width as their height follows the audio.\n\nBug reports and feature requests are tracked in [GitHub Issues](https://github.com/sashokey/muzika/issues).\n\nHome scrolling may still stutter while the **Shuffle** animation is visible.\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
+  "notes": "- Align the 16 **Audio info** spectrum bars to physical pixels so they have equal widths on 1× and 2× displays.\n- Turn off **Animated word highlighting** to highlight the active line or word in full at the start of its cue.\n- Use **Auto-scroll untimed lyrics** in **Settings → Lyrics → Appearance** to control automatic scrolling for lyrics without timestamps.\n- Use **Show album in Now Playing** and **Show release year in Now Playing** in **Settings → Appearance → Layout** to control each credit independently.\n\nHome scrolling may still stutter while the **Shuffle** animation is visible.\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
 }

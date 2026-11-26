@@ -287,6 +287,8 @@ enum PerformanceProbe {
             Action("playback.repeat") { $0.state.playback.repeatMode = .all },
             Action("playback.volume") { $0.state.setVolume(0.35) },
             Action("player.open") { $0.state.showPlayer() },
+            Action("player.audio_info_spectrum_width") { _ in try verifyAudioInfoSpectrumWidth() },
+            Action("player.track_credit_visibility") { try verifyTrackCreditVisibility($0.media[0]) },
             Action("player.lyrics") { $0.state.togglePanel(.lyrics) },
             Action("lyrics.auto_follow") { fixture in
                 let scroll = try fixture.lyricsScrollView()
@@ -343,6 +345,72 @@ enum PerformanceProbe {
             Action("cache.artwork_clear") { $0.state.library.clearArtworkCache() },
             Action("playback.dismiss") { $0.state.dismissPlayback() },
         ]
+    }
+
+    private static func verifyAudioInfoSpectrumWidth() throws {
+        for scale: CGFloat in [1, 2] {
+            let quiet = try spectrumBarPixels(heights: Array(repeating: 3.9255, count: 16), scale: scale)
+            let varying = try spectrumBarPixels(heights: (0..<16).map { 3.9255 + 17 * CGFloat($0) / 15 }, scale: scale)
+            let widths = quiet.map(\.width) + varying.map(\.width)
+            guard quiet.count == 16, varying.count == 16, Set(widths).count == 1,
+                  varying[15].height > quiet[15].height * 2 else {
+                throw HomeScrollCheck.Failure("Audio info spectrum widths or heights differ from expectations at \(scale)×: \(widths)")
+            }
+        }
+    }
+
+    private static func spectrumBarPixels(heights: [CGFloat], scale: CGFloat) throws -> [(width: Int, height: Int)] {
+        let renderer = ImageRenderer(content: AudioInfoSpectrumBars(heights: heights, width: 105, peakHeight: 21)
+            .foregroundStyle(.white).environment(\.displayScale, scale))
+        renderer.scale = scale
+        guard let image = renderer.cgImage,
+              let context = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8,
+                                      bytesPerRow: image.width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let bytes = context.data?.assumingMemoryBound(to: UInt8.self) else {
+            throw HomeScrollCheck.Failure("Could not render Audio info spectrum")
+        }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        var bars: [(width: Int, height: Int)] = []
+        var run = (width: 0, height: 0)
+        for x in 0..<image.width {
+            let height = (0..<image.height).count { bytes[$0 * context.bytesPerRow + x * 4 + 3] >= 128 }
+            if height > 0 {
+                run.width += 1
+                run.height = max(run.height, height)
+            } else if run.width > 0 {
+                bars.append(run)
+                run = (0, 0)
+            }
+        }
+        if run.width > 0 { bars.append(run) }
+        return bars
+    }
+
+    private static func verifyTrackCreditVisibility(_ track: AudioTrack) throws {
+        func size(album: Bool, year: Bool, maxWidth: CGFloat = 450) -> CGSize {
+            let renderer = ImageRenderer(content: PlayingTrackCredits(
+                track: track, showsAlbum: album, showsReleaseYear: year, navigate: { _ in }
+            ))
+            renderer.proposedSize = ProposedViewSize(width: maxWidth, height: nil)
+            var size = CGSize.zero
+            renderer.render { rendered, _ in size = rendered }
+            return size
+        }
+
+        let both = size(album: true, year: true)
+        let album = size(album: true, year: false)
+        let year = size(album: false, year: true)
+        let artist = size(album: false, year: false)
+        guard artist.width > 0, both.width > album.width, both.width > year.width,
+              album.width > artist.width, year.width > artist.width,
+              abs(both.width + artist.width - album.width - year.width) < 2 else {
+            throw HomeScrollCheck.Failure("Now Playing must show the album and year independently")
+        }
+        let narrow = size(album: true, year: true, maxWidth: 110)
+        guard narrow.width <= 110, narrow.height > both.height else {
+            throw HomeScrollCheck.Failure("The visible Now Playing credits must fit a narrow layout")
+        }
     }
 
     @MainActor

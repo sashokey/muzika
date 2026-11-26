@@ -187,6 +187,10 @@ struct PreferencesView: View {
                             UserDefaults.standard.set(value, forKey: "appearance.continueListening")
                         }
                         .id(PreferencesItem.continueListening)
+                    Toggle(PreferencesItem.nowPlayingAlbum.title, isOn: $preferences.showsNowPlayingAlbum)
+                        .id(PreferencesItem.nowPlayingAlbum)
+                    Toggle(PreferencesItem.nowPlayingReleaseYear.title, isOn: $preferences.showsNowPlayingReleaseYear)
+                        .id(PreferencesItem.nowPlayingReleaseYear)
                 }
             }
         case .playback:
@@ -248,6 +252,8 @@ struct PreferencesView: View {
                         .id(PreferencesItem.lyricsBlur)
                     Toggle(PreferencesItem.animatedWordHighlighting.title, isOn: $preferences.animatesWordHighlighting)
                         .id(PreferencesItem.animatedWordHighlighting)
+                    Toggle(PreferencesItem.autoScrollUntimedLyrics.title, isOn: $preferences.automaticallyScrollsUntimedLyrics)
+                        .id(PreferencesItem.autoScrollUntimedLyrics)
                 }
                 Section("Lyrics timing") {
                     SettingsSliderRow(

@@ -70,24 +70,15 @@ struct ArtworkSpectrumBadge: View {
     }
 
     private var infoBars: some View {
-        let levels = levels ?? restingLevels
-        let width = width ?? diameter
-        let column = width / CGFloat(levels.count)
         let peakHeight = diameter + 2 * verticalOutset
         let restingHeight = diameter * (0.08 + 0.79 * Self.minimumSpectrumLevel)
-        return HStack(spacing: 0) {
-            ForEach(levels.indices, id: \.self) { index in
-                let level = levels[index]
-                let progress = (level - Self.minimumSpectrumLevel) / (1 - Self.minimumSpectrumLevel)
-                Capsule()
-                    .fill(.foreground)
-                    .frame(width: column * 0.5,
-                           height: restingHeight + (peakHeight - restingHeight) * progress)
-                    .frame(width: column, height: peakHeight)
-            }
+        let heights = (levels ?? restingLevels).map { level in
+            let progress = (level - Self.minimumSpectrumLevel) / (1 - Self.minimumSpectrumLevel)
+            return restingHeight + (peakHeight - restingHeight) * progress
         }
-        .frame(width: width, height: diameter)
-        .environment(\.layoutDirection, .leftToRight)
+        return AudioInfoSpectrumBars(heights: heights, width: width ?? diameter, peakHeight: peakHeight)
+            .frame(height: diameter)
+            .environment(\.layoutDirection, .leftToRight)
     }
 
     static func bands(from spectrum: [Float], count: Int = 5) -> [CGFloat] {
@@ -141,5 +132,29 @@ struct ArtworkSpectrumBadge: View {
             do { try await Task.sleep(for: .milliseconds(85)) }
             catch { return }
         }
+    }
+}
+
+struct AudioInfoSpectrumBars: View {
+    let heights: [CGFloat]
+    let width: CGFloat
+    let peakHeight: CGFloat
+
+    @Environment(\.pixelLength) private var pixelLength
+
+    var body: some View {
+        let column = width / CGFloat(heights.count)
+        let barWidth = max(pixelLength, (column * 0.5 / pixelLength).rounded() * pixelLength)
+        return ZStack {
+            ForEach(heights.indices, id: \.self) { index in
+                let left = (CGFloat(index) + 0.5) * column - barWidth * 0.5
+                let alignedLeft = (left / pixelLength).rounded() * pixelLength
+                Capsule()
+                    .fill(.foreground)
+                    .frame(width: barWidth, height: heights[index])
+                    .position(x: alignedLeft + barWidth * 0.5, y: peakHeight * 0.5)
+            }
+        }
+        .frame(width: width, height: peakHeight)
     }
 }

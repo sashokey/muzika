@@ -41,6 +41,7 @@
 "Audio info, %@" = "ข้อมูลเสียง %@";
 "Audio quality" = "คุณภาพเสียง";
 "Auto Scan" = "สแกนอัตโนมัติ";
+"Auto-scroll untimed lyrics" = "เลื่อนเนื้อเพลงที่ไม่มีการระบุเวลาโดยอัตโนมัติ";
 "Back" = "ย้อนกลับ";
 "Backing vocals. Seeks to this line." = "เสียงร้องประสาน เล่นจากบรรทัดนี้";
 "Bit Depth" = "ความลึกบิต";
@@ -256,7 +257,9 @@
 "Select a settings category." = "เลือกหมวดหมู่การตั้งค่า";
 "Settings" = "การตั้งค่า";
 "Show" = "แสดง";
+"Show album in Now Playing" = "แสดงอัลบั้มในหน้ากำลังเล่นอยู่";
 "Show in Finder" = "แสดงใน Finder";
+"Show release year in Now Playing" = "แสดงปีที่ออกจำหน่ายในหน้ากำลังเล่นอยู่";
 "Show unreadable files" = "แสดงไฟล์ที่อ่านไม่ได้";
 "Shuffle" = "สุ่มเล่น";
 "Sidebar" = "แถบด้านข้าง";

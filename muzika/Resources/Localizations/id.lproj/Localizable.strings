@@ -41,6 +41,7 @@
 "Audio info, %@" = "Info audio, %@";
 "Audio quality" = "Kualitas audio";
 "Auto Scan" = "Pindai Otomatis";
+"Auto-scroll untimed lyrics" = "Gulir otomatis lirik tanpa penanda waktu";
 "Back" = "Kembali";
 "Backing vocals. Seeks to this line." = "Vokal latar. Lompat ke baris ini.";
 "Bit Depth" = "Kedalaman Bit";
@@ -256,7 +257,9 @@
 "Select a settings category." = "Pilih kategori pengaturan.";
 "Settings" = "Pengaturan";
 "Show" = "Tampilkan";
+"Show album in Now Playing" = "Tampilkan album di Sedang Diputar";
 "Show in Finder" = "Tampilkan di Finder";
+"Show release year in Now Playing" = "Tampilkan tahun rilis di Sedang Diputar";
 "Show unreadable files" = "Tampilkan file yang tidak dapat dibaca";
 "Shuffle" = "Acak";
 "Sidebar" = "Bar Samping";

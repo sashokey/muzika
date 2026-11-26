@@ -185,7 +185,9 @@ struct NowPlayingView: View {
                     Text(track.title)
                         .font(.title2.bold())
                         .lineLimit(2)
-                    PlayingTrackCredits(track: track, navigate: state.navigate)
+                    PlayingTrackCredits(track: track, showsAlbum: state.preferences.showsNowPlayingAlbum,
+                                        showsReleaseYear: state.preferences.showsNowPlayingReleaseYear,
+                                        navigate: state.navigate)
                 }
                 Spacer(minLength: 0)
                 Menu {
@@ -308,7 +310,8 @@ struct NowPlayingView: View {
                         document: document, position: { state.playback.livePosition }, playing: state.playback.playing,
                         offset: state.preferences.lyricsOffset, textSize: state.preferences.lyricsSize,
                         blur: state.preferences.lyricsBlur && (!reduceTransparency || state.preferences.forceBlur),
-                        animatesWordHighlighting: state.preferences.animatesWordHighlighting,
+                        highlighting: state.preferences.animatesWordHighlighting ? .progressive : .immediate,
+                        automaticallyScrollsUntimedLyrics: state.preferences.automaticallyScrollsUntimedLyrics,
                         seek: state.playback.seek(to:), topOverflow: topOverflow,
                         positionSnapshot: { state.playback.position }, duration: state.playback.current?.duration,
                         bottomClearance: panelControlsHeight + 12, isWindowVisible: visibleWindow

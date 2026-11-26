@@ -41,6 +41,7 @@
 "Audio info, %@" = "オーディオ情報、%@";
 "Audio quality" = "音質";
 "Auto Scan" = "自動スキャン";
+"Auto-scroll untimed lyrics" = "タイムスタンプのない歌詞を自動スクロール";
 "Back" = "戻る";
 "Backing vocals. Seeks to this line." = "バックボーカル。この行の再生位置に移動します。";
 "Bit Depth" = "ビット深度";
@@ -256,7 +257,9 @@
 "Select a settings category." = "設定のカテゴリを選択してください。";
 "Settings" = "設定";
 "Show" = "表示";
+"Show album in Now Playing" = "「再生中」にアルバムを表示";
 "Show in Finder" = "Finderで表示";
+"Show release year in Now Playing" = "「再生中」にリリース年を表示";
 "Show unreadable files" = "読み込めないファイルを表示";
 "Shuffle" = "シャッフル";
 "Sidebar" = "サイドバー";

@@ -7,7 +7,8 @@ struct LyricsPanel: View {
     let offset: Double
     let textSize: Double
     let blur: Bool
-    let animatesWordHighlighting: Bool
+    let highlighting: TimedLyricsHighlighting
+    let automaticallyScrollsUntimedLyrics: Bool
     let seek: @MainActor (Double) -> Void
     var topOverflow: CGFloat = 0
     var positionSnapshot: (@MainActor () -> Double)? = nil
@@ -27,7 +28,7 @@ struct LyricsPanel: View {
                 playing: playing, offset: offset, textSize: textSize,
                 blur: blur && !reduceMotion && contrast != .increased,
                 reduceMotion: reduceMotion, topOverflow: topOverflow, seek: seek, duration: duration,
-                animatesWordHighlighting: animatesWordHighlighting
+                highlighting: highlighting
             ))
         } else {
             GeometryReader { geometry in
@@ -61,13 +62,15 @@ struct LyricsPanel: View {
                     .frame(maxWidth: .infinity)
                     .padding(.bottom, bottomClearance)
                     .background {
-                        UntimedLyricsScrollDriver(
-                            position: position, positionSnapshot: positionSnapshot?() ?? position(),
-                            duration: duration, playing: playing, visible: isWindowVisible && scenePhase != .background,
-                            reduceMotion: reduceMotion
-                        )
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
+                        if automaticallyScrollsUntimedLyrics {
+                            UntimedLyricsScrollDriver(
+                                position: position, positionSnapshot: positionSnapshot?() ?? position(),
+                                duration: duration, playing: playing, visible: isWindowVisible && scenePhase != .background,
+                                reduceMotion: reduceMotion
+                            )
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
+                        }
                     }
                 }
                 .scrollIndicators(.never, axes: .vertical)

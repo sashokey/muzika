@@ -41,6 +41,7 @@
 "Audio info, %@" = "Audio info, %@";
 "Audio quality" = "Audio quality";
 "Auto Scan" = "Auto Scan";
+"Auto-scroll untimed lyrics" = "Auto-scroll untimed lyrics";
 "Back" = "Back";
 "Backing vocals. Seeks to this line." = "Backing vocals. Seeks to this line.";
 "Bit Depth" = "Bit Depth";
@@ -256,7 +257,9 @@
 "Select a settings category." = "Select a settings category.";
 "Settings" = "Settings";
 "Show" = "Show";
+"Show album in Now Playing" = "Show album in Now Playing";
 "Show in Finder" = "Show in Finder";
+"Show release year in Now Playing" = "Show release year in Now Playing";
 "Show unreadable files" = "Show unreadable files";
 "Shuffle" = "Shuffle";
 "Sidebar" = "Sidebar";

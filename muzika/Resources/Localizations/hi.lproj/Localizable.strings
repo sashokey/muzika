@@ -41,6 +41,7 @@
 "Audio info, %@" = "ऑडियो की जानकारी, %@";
 "Audio quality" = "ऑडियो की गुणवत्ता";
 "Auto Scan" = "ऑटो स्कैन";
+"Auto-scroll untimed lyrics" = "बिना टाइमस्टैम्प वाले गीत के बोल अपने आप स्क्रॉल करें";
 "Back" = "वापस जाएँ";
 "Backing vocals. Seeks to this line." = "सहगायन। प्लेबैक को इस पंक्ति पर ले जाता है।";
 "Bit Depth" = "बिट डेप्थ";
@@ -256,7 +257,9 @@
 "Select a settings category." = "सेटिंग्ज़ की कोई श्रेणी चुनें।";
 "Settings" = "सेटिंग्ज़";
 "Show" = "दिखाएँ";
+"Show album in Now Playing" = "‘अभी चल रहा है’ में ऐल्बम दिखाएँ";
 "Show in Finder" = "Finder में दिखाएँ";
+"Show release year in Now Playing" = "‘अभी चल रहा है’ में रिलीज़ का साल दिखाएँ";
 "Show unreadable files" = "न पढ़ी जा सकने वाली फ़ाइलें दिखाएँ";
 "Shuffle" = "शफ़ल करें";
 "Sidebar" = "साइडबार";

@@ -3,6 +3,8 @@ import SwiftUI
 @MainActor
 struct PlayingTrackCredits: View {
     let track: AudioTrack
+    let showsAlbum: Bool
+    let showsReleaseYear: Bool
     let navigate: (LibraryRoute) -> Void
 
     private static let albumColor = Color.secondary.opacity(0.85)
@@ -14,11 +16,13 @@ struct PlayingTrackCredits: View {
 
     var body: some View {
         let artists = artistSegments
-        let album = Segment(text: track.album, route: track.isTemporary ? nil : BrowseGroup.albumRoute(track.albumKey))
-        let hasAlbumLine = !album.text.isEmpty || track.year != nil
+        let album = Segment(text: showsAlbum ? track.album : "",
+                            route: track.isTemporary ? nil : BrowseGroup.albumRoute(track.albumKey))
+        let year = showsReleaseYear ? track.year : nil
+        let hasAlbumLine = !album.text.isEmpty || year != nil
         Group {
             if artists.isEmpty {
-                if hasAlbumLine { albumLine(album, year: track.year).lineLimit(2) }
+                if hasAlbumLine { albumLine(album, year: year).lineLimit(2) }
             } else if !hasAlbumLine {
                 artistLine(artists).lineLimit(2)
             } else {
@@ -26,12 +30,12 @@ struct PlayingTrackCredits: View {
                     HStack(spacing: 0) {
                         artistLine(artists)
                         Text(verbatim: " · ")
-                        albumLine(album, year: track.year)
+                        albumLine(album, year: year)
                     }
                     .fixedSize(horizontal: true, vertical: false)
                     VStack(alignment: .leading, spacing: 0) {
                         artistLine(artists)
-                        albumLine(album, year: track.year)
+                        albumLine(album, year: year)
                     }
                 }
                 .lineLimit(1)

@@ -41,6 +41,7 @@
 "Audio info, %@" = "Thông tin âm thanh, %@";
 "Audio quality" = "Chất lượng âm thanh";
 "Auto Scan" = "Quét tự động";
+"Auto-scroll untimed lyrics" = "Tự động cuộn lời bài hát không có mốc thời gian";
 "Back" = "Quay lại";
 "Backing vocals. Seeks to this line." = "Giọng hát đệm. Chuyển đến dòng này.";
 "Bit Depth" = "Độ sâu bit";
@@ -256,7 +257,9 @@
 "Select a settings category." = "Hãy chọn một mục cài đặt.";
 "Settings" = "Cài đặt";
 "Show" = "Hiển thị";
+"Show album in Now Playing" = "Hiện album trên màn hình Đang phát";
 "Show in Finder" = "Hiển thị trong Finder";
+"Show release year in Now Playing" = "Hiện năm phát hành trên màn hình Đang phát";
 "Show unreadable files" = "Hiển thị các tệp không đọc được";
 "Shuffle" = "Phát ngẫu nhiên";
 "Sidebar" = "Thanh bên";

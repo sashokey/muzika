@@ -41,6 +41,7 @@
 "Audio info, %@" = "Infos audio, %@";
 "Audio quality" = "Qualité audio";
 "Auto Scan" = "Analyse automatique";
+"Auto-scroll untimed lyrics" = "Défilement automatique des paroles non synchronisées";
 "Back" = "Retour";
 "Backing vocals. Seeks to this line." = "Chœurs. Accède à cette ligne.";
 "Bit Depth" = "Résolution en bits";
@@ -256,7 +257,9 @@
 "Select a settings category." = "Sélectionnez une catégorie de réglages.";
 "Settings" = "Réglages";
 "Show" = "Afficher";
+"Show album in Now Playing" = "Afficher l’album dans « À l’écoute »";
 "Show in Finder" = "Afficher dans le Finder";
+"Show release year in Now Playing" = "Afficher l’année de sortie dans « À l’écoute »";
 "Show unreadable files" = "Afficher les fichiers illisibles";
 "Shuffle" = "Lecture aléatoire";
 "Sidebar" = "Barre latérale";

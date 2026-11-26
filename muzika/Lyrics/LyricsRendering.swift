@@ -68,7 +68,7 @@ nonisolated struct LyricsTextBlock: Sendable {
 enum LyricsAccentMotion {
     case playing
     case paused
-    case reduced
+    case immediate
 }
 
 @MainActor
@@ -369,7 +369,7 @@ private final class LyricsBlockLayer {
         accentPosition = position
         currentMask.removeAnimation(forKey: Self.sweepKey)
 
-        let partial = accentMask(at: position, wholeWord: motion == .reduced)
+        let partial = accentMask(at: position, wholeWord: motion == .immediate)
         guard motion == .playing else {
             currentMask.path = partial
             return
