@@ -632,29 +632,35 @@ enum PerformanceProbe {
               let viewport = row.superview else {
             throw HomeScrollCheck.Failure("Could not lay out a native Genres row")
         }
-        let location = viewport.convert(CGPoint(x: row.frame.minX + 18, y: row.frame.midY - 0.5), to: nil)
-        guard let event = NSEvent.mouseEvent(with: .mouseMoved,
-                  location: location,
-                  modifierFlags: [], timestamp: 0, windowNumber: 0,
-                  context: nil, eventNumber: 0, clickCount: 0, pressure: 0) else {
-            throw HomeScrollCheck.Failure("Could not create the Genres pointer event")
-        }
+        let center = CGPoint(x: row.frame.minX + 18, y: row.frame.midY - 0.5)
+        let location = viewport.convert(center, to: nil)
         if capturesFrames {
             let titleLocation = viewport.convert(CGPoint(x: row.frame.minX + 85, y: row.frame.midY - 0.5), to: nil)
             try await verifyPresentedGenreHover(window: window, viewport: viewport, artwork: location, title: titleLocation)
             return
         }
-        window.pointer = location
-        viewport.mouseMoved(with: event)
-        let animations = viewport.subviews.last?.layer.map { layer in
-            (layer.animationKeys() ?? []).compactMap { layer.animation(forKey: $0) as? CABasicAnimation }
-        } ?? []
-        guard animations.contains(where: {
-            $0.keyPath == "opacity" && ($0.fromValue as? NSNumber)?.doubleValue == 0
-                && ($0.toValue as? NSNumber)?.doubleValue == 1 && $0.duration > 0
-        }) else {
-            throw HomeScrollCheck.Failure("The Genres Play overlay appeared without an opacity transition")
+
+        func move(to point: NSPoint) throws {
+            guard let event = NSEvent.mouseEvent(with: .mouseMoved, location: point, modifierFlags: [], timestamp: 0,
+                                                windowNumber: 0, context: nil, eventNumber: 0, clickCount: 0,
+                                                pressure: 0) else {
+                throw HomeScrollCheck.Failure("Could not create the Genres pointer event")
+            }
+            window.pointer = point
+            viewport.mouseMoved(with: event)
         }
+
+        try move(to: location)
+        guard let overlay = viewport.subviews.first(where: {
+            $0 !== row && $0.frame == row.frame && !$0.isHidden && ($0.layer?.opacity ?? 1) > 0.99
+        }) else { throw HomeScrollCheck.Failure("Genres did not show the playback overlay on the hovered artwork") }
+
+        try move(to: CGPoint(x: -100, y: -100))
+        for _ in 0..<40 {
+            if overlay.isHidden || overlay.superview == nil { return }
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        throw HomeScrollCheck.Failure("Genres kept the playback overlay visible after pointer exit")
     }
 
     private static func verifyPresentedGenreHover(window: HoverCheckWindow, viewport: NSView,
