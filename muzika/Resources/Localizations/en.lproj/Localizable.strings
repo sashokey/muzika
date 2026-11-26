@@ -27,6 +27,7 @@
 "All Time" = "All Time";
 "All songs" = "All songs";
 "Always use blur effects" = "Always use blur effects";
+"Animated word highlighting" = "Animated word highlighting";
 "App" = "App";
 "Appearance" = "Appearance";
 "Artist" = "Artist";
@@ -189,6 +190,7 @@
 "No upcoming tracks" = "No upcoming tracks";
 "Nothing Played Yet" = "Nothing Played Yet";
 "Now Playing" = "Now Playing";
+"Now Playing audio spectrum" = "Now Playing audio spectrum";
 "OK" = "OK";
 "Off" = "Off";
 "On Repeat" = "On Repeat";

@@ -40,6 +40,7 @@ enum PreferencesPage: String, CaseIterable, Identifiable {
 enum PreferencesItem: String, CaseIterable, Identifiable {
     case heroAnimations = "Hero animations"
     case blurEffects = "Always use blur effects"
+    case nowPlayingAudioSpectrum = "Now Playing audio spectrum"
     case interfaceSize = "Interface size"
     case historyView = "History View"
     case continueListening = "Continue listening"
@@ -53,6 +54,7 @@ enum PreferencesItem: String, CaseIterable, Identifiable {
     case listeningStatistics = "Listening statistics"
     case lyricsSize = "Lyrics text size"
     case lyricsBlur = "Lyrics blur"
+    case animatedWordHighlighting = "Animated word highlighting"
     case lyricsTiming = "Lyrics timing"
     case defaultView = "Default view"
     case audioQuality = "Audio quality"
@@ -78,6 +80,7 @@ enum PreferencesItem: String, CaseIterable, Identifiable {
         switch self {
         case .heroAnimations: String(localized: "Hero animations")
         case .blurEffects: String(localized: "Always use blur effects")
+        case .nowPlayingAudioSpectrum: String(localized: "Now Playing audio spectrum")
         case .interfaceSize: String(localized: "Interface size")
         case .historyView: String(localized: "History View")
         case .continueListening: String(localized: "Continue listening")
@@ -91,6 +94,7 @@ enum PreferencesItem: String, CaseIterable, Identifiable {
         case .listeningStatistics: String(localized: "Listening statistics")
         case .lyricsSize: String(localized: "Lyrics text size")
         case .lyricsBlur: String(localized: "Lyrics blur")
+        case .animatedWordHighlighting: String(localized: "Animated word highlighting")
         case .lyricsTiming: String(localized: "Lyrics timing")
         case .defaultView: String(localized: "Default view")
         case .audioQuality: String(localized: "Audio quality")
@@ -114,12 +118,12 @@ enum PreferencesItem: String, CaseIterable, Identifiable {
 
     var page: PreferencesPage {
         switch self {
-        case .heroAnimations, .blurEffects, .interfaceSize, .historyView, .continueListening:
+        case .heroAnimations, .blurEffects, .nowPlayingAudioSpectrum, .interfaceSize, .historyView, .continueListening:
             .appearance
         case .loudVolume, .loudVolumeThreshold, .gapless, .noDuplicates, .lockQueue, .spatialAudio,
              .coverArt, .listeningStatistics:
             .playback
-        case .lyricsSize, .lyricsBlur, .lyricsTiming:
+        case .lyricsSize, .lyricsBlur, .animatedWordHighlighting, .lyricsTiming:
             .lyrics
         case .defaultView, .audioQuality, .songTap, .autoScan, .addFolder, .scanStatus, .scanLibrary, .forceScan,
              .cleanupMissing, .unreadableFiles, .clearLibrary:
@@ -231,6 +235,9 @@ final class Preferences {
     var forceBlur: Bool {
         didSet { defaults.set(forceBlur, forKey: "appearance.forceBlur") }
     }
+    var showsNowPlayingAudioSpectrum: Bool {
+        didSet { defaults.set(showsNowPlayingAudioSpectrum, forKey: "appearance.nowPlayingAudioSpectrum") }
+    }
     var largerInterface: Bool {
         didSet { defaults.set(largerInterface, forKey: "appearance.largerInterface") }
     }
@@ -251,6 +258,9 @@ final class Preferences {
     }
     var lyricsBlur: Bool {
         didSet { defaults.set(lyricsBlur, forKey: "lyrics.blur") }
+    }
+    var animatesWordHighlighting: Bool {
+        didSet { defaults.set(animatesWordHighlighting, forKey: "lyrics.animatesWordHighlighting") }
     }
     var lyricsOffset: Double {
         didSet { defaults.set(lyricsOffset, forKey: "lyrics.offset") }
@@ -280,6 +290,7 @@ final class Preferences {
         let defaults = UserDefaults.standard
         heroAnimations = defaults.object(forKey: "appearance.heroAnimations") as? Bool ?? true
         forceBlur = defaults.bool(forKey: "appearance.forceBlur")
+        showsNowPlayingAudioSpectrum = defaults.object(forKey: "appearance.nowPlayingAudioSpectrum") as? Bool ?? true
         largerInterface = defaults.bool(forKey: "appearance.largerInterface")
         historyGrid = defaults.object(forKey: "appearance.historyGrid") as? Bool ?? true
         confirmLoudVolume = defaults.bool(forKey: "playback.confirmVolume")
@@ -287,6 +298,7 @@ final class Preferences {
         coverStyle = CoverStyle(rawValue: defaults.string(forKey: "playback.coverStyle") ?? "") ?? .card
         lyricsSize = defaults.object(forKey: "lyrics.size") as? Double ?? 1
         lyricsBlur = defaults.object(forKey: "lyrics.blur") as? Bool ?? true
+        animatesWordHighlighting = defaults.object(forKey: "lyrics.animatesWordHighlighting") as? Bool ?? true
         lyricsOffset = defaults.object(forKey: "lyrics.offset") as? Double ?? 0
         defaultView = LibraryDefaultView(rawValue: defaults.string(forKey: "library.defaultView") ?? "") ?? .lastUsed
         audioQuality = QualityDisplay(rawValue: defaults.string(forKey: "library.audioQuality") ?? "") ?? .fileFormat

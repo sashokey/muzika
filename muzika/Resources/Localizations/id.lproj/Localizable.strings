@@ -27,6 +27,7 @@
 "All Time" = "Sepanjang Waktu";
 "All songs" = "Semua lagu";
 "Always use blur effects" = "Selalu gunakan efek buram";
+"Animated word highlighting" = "Animasi sorotan kata";
 "App" = "App";
 "Appearance" = "Tampilan";
 "Artist" = "Artis";
@@ -189,6 +190,7 @@
 "No upcoming tracks" = "Tidak ada track berikutnya";
 "Nothing Played Yet" = "Belum Ada yang Diputar";
 "Now Playing" = "Sedang Diputar";
+"Now Playing audio spectrum" = "Spektrum audio di Sedang Diputar";
 "OK" = "OKE";
 "Off" = "Mati";
 "On Repeat" = "Sering Diputar";

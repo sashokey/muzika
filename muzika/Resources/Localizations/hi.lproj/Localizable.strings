@@ -27,6 +27,7 @@
 "All Time" = "अब तक";
 "All songs" = "सभी गीत";
 "Always use blur effects" = "धुँधलेपन के इफ़ेक्ट हमेशा इस्तेमाल करें";
+"Animated word highlighting" = "शब्दों को ऐनिमेशन के साथ हाइलाइट करें";
 "App" = "ऐप";
 "Appearance" = "दिखावट";
 "Artist" = "कलाकार";
@@ -189,6 +190,7 @@
 "No upcoming tracks" = "क़तार में आगे कोई ट्रैक नहीं है";
 "Nothing Played Yet" = "अभी तक कुछ नहीं चलाया गया";
 "Now Playing" = "अभी चल रहा है";
+"Now Playing audio spectrum" = "‘अभी चल रहा है’ में ऑडियो स्पेक्ट्रम";
 "OK" = "ठीक है";
 "Off" = "बंद";
 "On Repeat" = "बार-बार सुने गए";

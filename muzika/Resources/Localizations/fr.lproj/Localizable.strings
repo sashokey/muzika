@@ -27,6 +27,7 @@
 "All Time" = "Depuis le début";
 "All songs" = "Tous les morceaux";
 "Always use blur effects" = "Toujours utiliser les effets de flou";
+"Animated word highlighting" = "Surlignage animé des mots";
 "App" = "App";
 "Appearance" = "Apparence";
 "Artist" = "Artiste";
@@ -189,6 +190,7 @@
 "No upcoming tracks" = "Aucun morceau à venir";
 "Nothing Played Yet" = "Aucune lecture pour le moment";
 "Now Playing" = "À l’écoute";
+"Now Playing audio spectrum" = "Spectre audio dans « À l’écoute »";
 "OK" = "OK";
 "Off" = "Désactivée";
 "On Repeat" = "En boucle";

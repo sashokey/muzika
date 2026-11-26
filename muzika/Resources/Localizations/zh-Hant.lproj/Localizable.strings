@@ -27,6 +27,7 @@
 "All Time" = "所有時間";
 "All songs" = "所有歌曲";
 "Always use blur effects" = "始終使用模糊效果";
+"Animated word highlighting" = "動態醒目標示歌詞字詞";
 "App" = "App";
 "Appearance" = "外觀";
 "Artist" = "藝人";
@@ -189,6 +190,7 @@
 "No upcoming tracks" = "沒有待播歌曲";
 "Nothing Played Yet" = "尚未播放歌曲";
 "Now Playing" = "正在播放";
+"Now Playing audio spectrum" = "「正在播放」音訊頻譜";
 "OK" = "好";
 "Off" = "關閉";
 "On Repeat" = "循環播放";

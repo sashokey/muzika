@@ -168,6 +168,8 @@ struct PreferencesView: View {
                         .id(PreferencesItem.heroAnimations)
                     Toggle(PreferencesItem.blurEffects.title, isOn: $preferences.forceBlur)
                         .id(PreferencesItem.blurEffects)
+                    Toggle(PreferencesItem.nowPlayingAudioSpectrum.title, isOn: $preferences.showsNowPlayingAudioSpectrum)
+                        .id(PreferencesItem.nowPlayingAudioSpectrum)
                 }
                 Section("Layout") {
                     Picker(PreferencesItem.interfaceSize.title, selection: $preferences.largerInterface) {
@@ -244,6 +246,8 @@ struct PreferencesView: View {
                     .id(PreferencesItem.lyricsSize)
                     Toggle(PreferencesItem.lyricsBlur.title, isOn: $preferences.lyricsBlur)
                         .id(PreferencesItem.lyricsBlur)
+                    Toggle(PreferencesItem.animatedWordHighlighting.title, isOn: $preferences.animatesWordHighlighting)
+                        .id(PreferencesItem.animatedWordHighlighting)
                 }
                 Section("Lyrics timing") {
                     SettingsSliderRow(

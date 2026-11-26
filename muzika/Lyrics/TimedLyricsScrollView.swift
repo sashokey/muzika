@@ -13,6 +13,7 @@ struct TimedLyricsConfiguration {
     let topOverflow: CGFloat
     let seek: @MainActor (Double) -> Void
     var duration: Double? = nil
+    var animatesWordHighlighting = true
 }
 
 @MainActor
@@ -350,8 +351,9 @@ final class TimedLyricsScrollView: NSScrollView {
         guard let configuration, let geometry else { return }
         let now = overrideTime ?? audioTime
         let delta = accentPosition.map { now - $0 }
-        let motion: LyricsAccentMotion = configuration.reduceMotion ? .reduced
-            : (configuration.playing && delta != 0 ? .playing : .paused)
+        let isAdvancing = configuration.playing && delta != 0
+        let motion: LyricsAccentMotion = configuration.reduceMotion || !configuration.animatesWordHighlighting
+            ? .reduced : (isAdvancing ? .playing : .paused)
         let reposition = force || (delta.map { $0 < 0 || $0 > 0.12 } ?? false)
         let refreshAccents = reposition || motion != accentMotion || (motion == .paused && delta != 0)
         accentPosition = now
@@ -408,7 +410,7 @@ final class TimedLyricsScrollView: NSScrollView {
             }
             if following {
                 let staggerFrom: Int?
-                if !reposition, motion == .playing, case .row = previous, case .row(let row) = focus {
+                if !reposition, isAdvancing, !configuration.reduceMotion, case .row = previous, case .row(let row) = focus {
                     staggerFrom = row
                 } else {
                     staggerFrom = nil

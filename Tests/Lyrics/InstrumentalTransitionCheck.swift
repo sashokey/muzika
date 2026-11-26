@@ -66,10 +66,12 @@ private final class InstrumentalTransitionCheck: NSObject, NSApplicationDelegate
             LyricsLine(id: 2, text: "Vocal line after the break", start: 10, end: 11),
             LyricsLine(id: 3, text: "Last vocal line", start: 11, end: 12),
         ])
-        func apply(_ time: Double, reduceMotion: Bool = false, lyrics: LyricsDocument? = nil, playing: Bool = false) {
+        func apply(_ time: Double, reduceMotion: Bool = false, lyrics: LyricsDocument? = nil, playing: Bool = false,
+                   animatesWordHighlighting: Bool = true) {
             view.configure(TimedLyricsConfiguration(document: lyrics ?? document, position: { time },
                                                     pausedPosition: playing ? nil : time, playing: playing, offset: 0, textSize: 1, blur: false,
-                                                    reduceMotion: reduceMotion, topOverflow: 0, seek: { _ in }))
+                                                    reduceMotion: reduceMotion, topOverflow: 0, seek: { _ in },
+                                                    animatesWordHighlighting: animatesWordHighlighting))
         }
 
         for (time, index) in [(5.0, 0), (10.0, 2)] {
@@ -213,8 +215,24 @@ private final class InstrumentalTransitionCheck: NSObject, NSApplicationDelegate
                                         "Seeking did not replace the word sweep")
                 try expect(abs(sweep.duration - 0.35) < 0.001, "Seeking must start the compositor at the new word fraction")
             }
+            apply(0.66, lyrics: lyrics, playing: true, animatesWordHighlighting: false)
+            let liveWholeWord = try accentBounds()
+            try expect(liveWholeWord == still && mask.animation(forKey: "lyrics-accent-sweep") == nil,
+                       "Turning word animation off during playback must cancel the sweep and fill the word")
+            apply(0.67, lyrics: lyrics, playing: true)
             apply(0.5, lyrics: lyrics)
             try expect(mask.animation(forKey: "lyrics-accent-sweep") == nil, "Pausing must cancel the live sweep")
+
+            apply(0.5, lyrics: lyrics, animatesWordHighlighting: false)
+            let wholeWord = try accentBounds()
+            try expect(wholeWord == still, "Turning word animation off must immediately highlight the full active word")
+            apply(0.8, lyrics: lyrics, playing: true, animatesWordHighlighting: false)
+            let laterWholeWord = try accentBounds()
+            try expect(laterWholeWord == wholeWord && mask.animation(forKey: "lyrics-accent-sweep") == nil,
+                       "With word animation off, the highlight must stay full while playing")
+            apply(0.8, lyrics: lyrics)
+            let resumedSweep = try accentBounds()
+            try expect(resumedSweep.width < wholeWord.width, "Restoring word animation must recover the current word fraction")
         }
 
         let wrappedWord = String(repeating: "W", count: 42)

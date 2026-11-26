@@ -27,6 +27,7 @@
 "All Time" = "Gesamter Zeitraum";
 "All songs" = "Alle Titel";
 "Always use blur effects" = "Weichzeichnung immer verwenden";
+"Animated word highlighting" = "Animierte Worthervorhebung";
 "App" = "App";
 "Appearance" = "Erscheinungsbild";
 "Artist" = "Interpret";
@@ -189,6 +190,7 @@
 "No upcoming tracks" = "Keine weiteren Titel";
 "Nothing Played Yet" = "Noch nichts abgespielt";
 "Now Playing" = "Aktuelle Wiedergabe";
+"Now Playing audio spectrum" = "Audiospektrum in „Aktuelle Wiedergabe“";
 "OK" = "OK";
 "Off" = "Aus";
 "On Repeat" = "Auf Wiederholung";

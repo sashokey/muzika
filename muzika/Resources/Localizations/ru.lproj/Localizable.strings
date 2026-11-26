@@ -27,6 +27,7 @@
 "All Time" = "За всё время";
 "All songs" = "Все песни";
 "Always use blur effects" = "Всегда использовать размытие";
+"Animated word highlighting" = "Анимированная подсветка слов";
 "App" = "Приложение";
 "Appearance" = "Внешний вид";
 "Artist" = "Исполнитель";
@@ -189,6 +190,7 @@
 "No upcoming tracks" = "Нет следующих треков";
 "Nothing Played Yet" = "Пока ничего не воспроизводилось";
 "Now Playing" = "Сейчас играет";
+"Now Playing audio spectrum" = "Спектр звука на экране «Сейчас играет»";
 "OK" = "OK";
 "Off" = "Выкл.";
 "On Repeat" = "На повторе";

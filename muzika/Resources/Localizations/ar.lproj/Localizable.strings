@@ -27,6 +27,7 @@
 "All Time" = "كل الأوقات";
 "All songs" = "كل الأغاني";
 "Always use blur effects" = "استخدام تأثيرات التمويه دائمًا";
+"Animated word highlighting" = "تمييز الكلمات المتحرك";
 "App" = "التطبيق";
 "Appearance" = "المظهر";
 "Artist" = "الفنان";
@@ -189,6 +190,7 @@
 "No upcoming tracks" = "لا توجد أغانٍ تالية";
 "Nothing Played Yet" = "لم يتم تشغيل أي أغنية بعد";
 "Now Playing" = "قيد التشغيل";
+"Now Playing audio spectrum" = "طيف الصوت في «قيد التشغيل»";
 "OK" = "موافق";
 "Off" = "إيقاف";
 "On Repeat" = "أغانٍ يتكرر تشغيلها";

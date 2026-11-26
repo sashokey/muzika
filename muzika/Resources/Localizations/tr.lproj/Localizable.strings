@@ -27,6 +27,7 @@
 "All Time" = "Tüm zamanlar";
 "All songs" = "Tüm parçalar";
 "Always use blur effects" = "Bulanıklaştırmayı her zaman kullan";
+"Animated word highlighting" = "Animasyonlu sözcük vurgulama";
 "App" = "Uygulama";
 "Appearance" = "Görünüş";
 "Artist" = "Sanatçı";
@@ -189,6 +190,7 @@
 "No upcoming tracks" = "Sırada başka parça yok";
 "Nothing Played Yet" = "Henüz parça çalınmadı";
 "Now Playing" = "Şu an çalınan";
+"Now Playing audio spectrum" = "Şu an çalınan ekranında ses spektrumu";
 "OK" = "Tamam";
 "Off" = "Kapalı";
 "On Repeat" = "Tekrar tekrar çalınanlar";

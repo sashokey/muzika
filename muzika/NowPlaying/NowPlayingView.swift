@@ -235,11 +235,17 @@ struct NowPlayingView: View {
                 Label {
                     Text(track.quality)
                 } icon: {
-                    ArtworkSpectrumBadge(
-                        playback: state.playback, diameter: PlayerIcon.glyphSize,
-                        style: .audioInfo, isPresented: visibleWindow, width: PanelControlsLayout.width,
-                        verticalOutset: hoverOutset.height
-                    )
+                    Group {
+                        if state.preferences.showsNowPlayingAudioSpectrum {
+                            ArtworkSpectrumBadge(
+                                playback: state.playback, diameter: PlayerIcon.glyphSize,
+                                style: .audioInfo, isPresented: visibleWindow, width: PanelControlsLayout.width,
+                                verticalOutset: hoverOutset.height
+                            )
+                        } else {
+                            Image(systemName: "waveform")
+                        }
+                    }
                     .accessibilityHidden(true)
                 }
                 .lineLimit(1)
@@ -302,6 +308,7 @@ struct NowPlayingView: View {
                         document: document, position: { state.playback.livePosition }, playing: state.playback.playing,
                         offset: state.preferences.lyricsOffset, textSize: state.preferences.lyricsSize,
                         blur: state.preferences.lyricsBlur && (!reduceTransparency || state.preferences.forceBlur),
+                        animatesWordHighlighting: state.preferences.animatesWordHighlighting,
                         seek: state.playback.seek(to:), topOverflow: topOverflow,
                         positionSnapshot: { state.playback.position }, duration: state.playback.current?.duration,
                         bottomClearance: panelControlsHeight + 12, isWindowVisible: visibleWindow

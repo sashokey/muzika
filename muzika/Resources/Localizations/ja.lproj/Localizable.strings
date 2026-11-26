@@ -27,6 +27,7 @@
 "All Time" = "全期間";
 "All songs" = "すべての曲";
 "Always use blur effects" = "常にぼかし効果を使用";
+"Animated word highlighting" = "単語のハイライトをアニメーション表示";
 "App" = "アプリ";
 "Appearance" = "外観";
 "Artist" = "アーティスト";
@@ -189,6 +190,7 @@
 "No upcoming tracks" = "次に再生する曲がありません";
 "Nothing Played Yet" = "まだ曲を再生していません";
 "Now Playing" = "再生中";
+"Now Playing audio spectrum" = "「再生中」のオーディオスペクトル";
 "OK" = "OK";
 "Off" = "オフ";
 "On Repeat" = "繰り返し聴いた曲";

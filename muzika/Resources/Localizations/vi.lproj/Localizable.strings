@@ -27,6 +27,7 @@
 "All Time" = "Mọi thời điểm";
 "All songs" = "Tất cả bài hát";
 "Always use blur effects" = "Luôn dùng hiệu ứng làm mờ";
+"Animated word highlighting" = "Tô sáng từ có hiệu ứng động";
 "App" = "Ứng dụng";
 "Appearance" = "Giao diện";
 "Artist" = "Nghệ sĩ";
@@ -189,6 +190,7 @@
 "No upcoming tracks" = "Không có bản nhạc tiếp theo";
 "Nothing Played Yet" = "Chưa phát nội dung nào";
 "Now Playing" = "Đang phát";
+"Now Playing audio spectrum" = "Phổ âm thanh trên màn hình Đang phát";
 "OK" = "OK";
 "Off" = "Tắt";
 "On Repeat" = "Nghe đi nghe lại";

@@ -7,6 +7,7 @@ struct LyricsPanel: View {
     let offset: Double
     let textSize: Double
     let blur: Bool
+    let animatesWordHighlighting: Bool
     let seek: @MainActor (Double) -> Void
     var topOverflow: CGFloat = 0
     var positionSnapshot: (@MainActor () -> Double)? = nil
@@ -25,7 +26,8 @@ struct LyricsPanel: View {
                 pausedPosition: playing ? nil : (positionSnapshot?() ?? position()),
                 playing: playing, offset: offset, textSize: textSize,
                 blur: blur && !reduceMotion && contrast != .increased,
-                reduceMotion: reduceMotion, topOverflow: topOverflow, seek: seek, duration: duration
+                reduceMotion: reduceMotion, topOverflow: topOverflow, seek: seek, duration: duration,
+                animatesWordHighlighting: animatesWordHighlighting
             ))
         } else {
             GeometryReader { geometry in

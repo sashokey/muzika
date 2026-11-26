@@ -27,6 +27,7 @@
 "All Time" = "所有时间";
 "All songs" = "所有歌曲";
 "Always use blur effects" = "始终使用模糊效果";
+"Animated word highlighting" = "动态高亮歌词单词";
 "App" = "App";
 "Appearance" = "外观";
 "Artist" = "艺人";
@@ -189,6 +190,7 @@
 "No upcoming tracks" = "没有待播歌曲";
 "Nothing Played Yet" = "尚未播放歌曲";
 "Now Playing" = "正在播放";
+"Now Playing audio spectrum" = "“正在播放”音频频谱";
 "OK" = "好";
 "Off" = "关闭";
 "On Repeat" = "循环播放";

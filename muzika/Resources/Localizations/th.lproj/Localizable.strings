@@ -27,6 +27,7 @@
 "All Time" = "ตลอดเวลา";
 "All songs" = "เพลงทั้งหมด";
 "Always use blur effects" = "ใช้เอฟเฟ็กต์เบลอเสมอ";
+"Animated word highlighting" = "ไฮไลต์คำแบบเคลื่อนไหว";
 "App" = "แอป";
 "Appearance" = "ลักษณะ";
 "Artist" = "ศิลปิน";
@@ -189,6 +190,7 @@
 "No upcoming tracks" = "ไม่มีเพลงถัดไป";
 "Nothing Played Yet" = "ยังไม่ได้เล่นเพลงใดๆ";
 "Now Playing" = "กำลังเล่นอยู่";
+"Now Playing audio spectrum" = "สเปกตรัมเสียงในหน้ากำลังเล่นอยู่";
 "OK" = "ตกลง";
 "Off" = "ปิด";
 "On Repeat" = "เพลงที่ฟังซ้ำ";
