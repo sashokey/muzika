@@ -210,7 +210,11 @@ enum PerformanceProbe {
         let memoryBefore = try footprint()
         var memoryPeak = memoryBefore
 
-        try await action.run(fixture)
+        do {
+            try await action.run(fixture)
+        } catch {
+            throw HomeScrollCheck.Failure("\(action.name): \(error)")
+        }
         fixture.host.layoutSubtreeIfNeeded()
         let work = milliseconds(started.duration(to: clock.now))
         if !action.name.hasPrefix("home.shuffle_scroll_") {
@@ -535,17 +539,36 @@ enum PerformanceProbe {
                 throw HomeScrollCheck.Failure("Up Next header has an isolated pixel at its trailing edge")
             }
         }
-        var bars = 0
-        var previous = false
-        for x in (bitmap.pixelsWide - pixels(64))..<(bitmap.pixelsWide - pixels(36)) {
-            let filled = (pixels(39)..<pixels(63)).contains { y in
-                guard let color = color(x: x, y: y) else { return false }
-                return min(color.redComponent, color.greenComponent, color.blueComponent) > 0.55
+        let scanColumns = max(0, bitmap.pixelsWide - pixels(88))..<max(0, bitmap.pixelsWide - pixels(16))
+        let scanRows = pixels(34)..<min(bitmap.pixelsHigh, pixels(69))
+        let scanlines = scanRows.map { y in
+            scanColumns.map { x in
+                color(x: x, y: y).map { min($0.redComponent, $0.greenComponent, $0.blueComponent) } ?? 0
             }
-            if filled && !previous { bars += 1 }
-            previous = filled
         }
-        guard bars == 5 else { throw HomeScrollCheck.Failure("Up Next current track has \(bars) visible visualizer bars") }
+        let hasSpectrum = scanlines.contains { scanline in
+            [0.46, 0.54, 0.62].contains { threshold in
+                var bars: [Range<Int>] = []
+                var start: Int?
+                for x in 0...scanline.count {
+                    if x < scanline.count, scanline[x] > threshold {
+                        if start == nil { start = x }
+                    } else if let first = start {
+                        bars.append(first..<x)
+                        start = nil
+                    }
+                }
+                guard bars.count >= 5 else { return false }
+                return (0...(bars.count - 5)).contains { first in
+                    let group = bars[first..<(first + 5)]
+                    let pitches = zip(group, group.dropFirst()).map { CGFloat($1.lowerBound - $0.lowerBound) / scale }
+                    return group.allSatisfy { CGFloat($0.count) / scale <= 3 }
+                        && pitches.allSatisfy { (2...4.5).contains($0) }
+                        && (11...15).contains(pitches.reduce(0, +))
+                }
+            }
+        }
+        guard hasSpectrum else { throw HomeScrollCheck.Failure("Up Next current track is missing the five-bar visualizer") }
     }
 
     private static func verifySongsArtworkCache(_ fixture: Fixture) async throws {
