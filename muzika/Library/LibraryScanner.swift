@@ -147,6 +147,7 @@ nonisolated enum LibraryScanner {
         _ sources: [LibrarySource],
         reusing previous: [String: IndexedAudioFile],
         mode: LibraryScanMode = .index,
+        musicAccess: MusicLibraryAccess = .currentUser,
         control: LibraryScanControl = LibraryScanControl(),
         onProgress: @Sendable (LibraryScanProgress) async -> Void = { _ in }
     ) async -> LibraryScanReport {
@@ -164,11 +165,13 @@ nonisolated enum LibraryScanner {
             progress.currentSourceName = source.name
             await onProgress(progress)
             let originalURL = source.url
-            if let lease = source.open(),
+            if !musicAccess.contains(originalURL), let lease = source.open(),
+               !musicAccess.contains(lease.canonicalURL),
                FileManager.default.isReadableFile(atPath: source.url.path),
                (try? source.url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
                 let previousReadErrorCount = report.errors.count - report.errors.offlineItems.count
-                let children = await audioFiles(in: source.url, errors: &report.errors, control: control)
+                let children = await audioFiles(in: lease.canonicalURL, errors: &report.errors,
+                                                musicAccess: musicAccess, control: control)
                 if previousReadErrorCount == report.errors.count - report.errors.offlineItems.count {
                     readableRoots.append(source.url)
                 } else {
@@ -246,7 +249,8 @@ nonisolated enum LibraryScanner {
     @concurrent
     static func scanTemporary(
         _ urls: [URL],
-        permanent: [String: IndexedAudioFile]
+        permanent: [String: IndexedAudioFile],
+        musicAccess: MusicLibraryAccess = .currentUser
     ) async -> ([TemporaryAudioFile], LibraryReadErrors) {
         var files: [TemporaryAudioFile] = []
         var errors = LibraryReadErrors()
@@ -254,7 +258,8 @@ nonisolated enum LibraryScanner {
         let openedAt = Date()
         for url in urls {
             if Task.isCancelled { break }
-            guard url.isFileURL, let lease = SecurityScopeLease(url: url) else {
+            guard url.isFileURL, !musicAccess.contains(url), let lease = SecurityScopeLease(url: url),
+                  !musicAccess.contains(lease.canonicalURL) else {
                 errors.add(url, "The item is unavailable.")
                 continue
             }
@@ -262,13 +267,13 @@ nonisolated enum LibraryScanner {
                 errors.skipOffline(url)
                 continue
             }
-            if let permanentFile = permanent[url.canonicalized.path] {
+            if let permanentFile = permanent[lease.canonicalURL.path] {
                 if seen.insert(permanentFile.track.id).inserted {
                     files.append(TemporaryAudioFile(file: permanentFile, lease: lease))
                 }
                 continue
             }
-            let children = await audioFiles(in: url.canonicalized, errors: &errors)
+            let children = await audioFiles(in: lease.canonicalURL, errors: &errors, musicAccess: musicAccess)
             for candidate in children {
                 if Task.isCancelled { break }
                 let id = candidate.url.path
@@ -299,11 +304,12 @@ nonisolated enum LibraryScanner {
     private static func audioFiles(
         in root: URL,
         errors: inout LibraryReadErrors,
+        musicAccess: MusicLibraryAccess,
         control: LibraryScanControl? = nil
     ) async -> [Candidate] {
         let keys: Set<URLResourceKey> = [
             .isDirectoryKey, .isRegularFileKey, .fileSizeKey, .contentModificationDateKey,
-            .ubiquitousItemDownloadingStatusKey
+            .ubiquitousItemDownloadingStatusKey, .isPackageKey, .isSymbolicLinkKey
         ]
         do {
             let values = try root.resourceValues(forKeys: keys)
@@ -327,46 +333,44 @@ nonisolated enum LibraryScanner {
             return []
         }
 
-        var traversalErrors: [(URL, Error)] = []
-        guard let enumerator = FileManager.default.enumerator(
-            at: root,
-            includingPropertiesForKeys: Array(keys),
-            options: [.skipsHiddenFiles, .skipsPackageDescendants],
-            errorHandler: { url, error in
-                traversalErrors.append((url, error))
-                return true
-            }
-        ) else {
-            errors.add(root, "The folder could not be read.")
-            return []
-        }
-
         var candidates: [Candidate] = []
         var seen: Set<String> = []
         var visited = 0
-        while let child = enumerator.nextObject() as? URL {
+        var pending = [root]
+        while let directory = pending.popLast() {
             if Task.isCancelled { break }
-            visited += 1
-            if visited.isMultiple(of: 128), let control, !(await control.checkpoint()) { break }
+            let children: [URL]
             do {
-                let values = try child.resourceValues(forKeys: keys)
-                let isAudio = values.isRegularFile == true &&
-                    AudioFileMetadata.supportedExtensions.contains(child.pathExtension.lowercased())
-                guard isAudio || values.isDirectory == true else { continue }
-                if child.needsDownload(status: values.ubiquitousItemDownloadingStatus) {
-                    if values.isDirectory == true { enumerator.skipDescendants() }
-                    errors.skipOffline(child)
-                    continue
-                }
-                guard isAudio else { continue }
-                let candidate = candidate(at: child, values: values)
-                if seen.insert(candidate.url.path).inserted { candidates.append(candidate) }
+                children = try FileManager.default.contentsOfDirectory(
+                    at: directory, includingPropertiesForKeys: [], options: [.skipsHiddenFiles]
+                )
             } catch {
-                errors.add(child, error)
+                errors.add(directory, error)
+                continue
             }
-        }
-        for (url, error) in traversalErrors {
-            errors.add(url, error)
+            for child in children {
+                if Task.isCancelled { break }
+                visited += 1
+                if visited.isMultiple(of: 128), let control, !(await control.checkpoint()) { break }
+                guard !musicAccess.contains(child) else { continue }
+                do {
+                    let values = try child.resourceValues(forKeys: keys)
+                    guard values.isSymbolicLink != true else { continue }
+                    let isAudio = values.isRegularFile == true &&
+                        AudioFileMetadata.supportedExtensions.contains(child.pathExtension.lowercased())
+                    guard isAudio || values.isDirectory == true else { continue }
+                    if child.needsDownload(status: values.ubiquitousItemDownloadingStatus) {
+                        errors.skipOffline(child)
+                    } else if values.isDirectory == true {
+                        if values.isPackage != true { pending.append(child) }
+                    } else {
+                        let candidate = candidate(at: child, values: values)
+                        if seen.insert(candidate.url.path).inserted { candidates.append(candidate) }
+                    }
+                } catch {
+                    errors.add(child, error)
+                }
+            }
         }
         return candidates.sorted { $0.url.path.localizedStandardCompare($1.url.path) == .orderedAscending }
     }

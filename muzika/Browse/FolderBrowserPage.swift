@@ -14,6 +14,7 @@ struct FolderBrowserPage: View {
     @State private var sortByName = true
     @State private var trackSort = TrackSortOrder(key: .title)
     @State private var filters = OfflineTrackFilters()
+    @State private var cache = FolderCache()
 
     private var selectedFolder: URL? {
         guard case .folder(let folder) = route else { return nil }
@@ -23,16 +24,31 @@ struct FolderBrowserPage: View {
     var body: some View {
         let folder = selectedFolder
         let terms = BrowseSearch.terms(query)
-        let descendants = folder.map { current in library.tracks.filter { belongs($0.url, to: current) } } ?? []
-        let folders = entries(for: folder, descendants: descendants).filter {
-            BrowseSearch.matches(terms, fields: [$0.name, $0.url.path]) ||
-                $0.tracks.contains { $0.matches(query) }
+        let data = cache.data(for: DataKey(revision: library.revision, folder: folder, sources: library.sources)) {
+            if let folder {
+                let listing = FolderListing(folder: folder, tracks: library.tracks)
+                let children = listing.children.map { name, tracks in
+                    Folder(url: folder.appendingPathComponent(name, isDirectory: true), name: name, tracks: tracks)
+                }
+                return (descendants: listing.descendants, directTracks: listing.directTracks, folders: children)
+            }
+            return (descendants: [], directTracks: [], folders: sourceFolders())
         }
-        let matches = descendants.filter {
-            $0.url.deletingLastPathComponent().standardizedFileURL.path == folder?.standardizedFileURL.path &&
-                $0.matches(query) && filters.matches($0)
+        let result = cache.result(for: FilterKey(query: query, sortByName: sortByName, trackSort: trackSort, filters: filters)) {
+            let folders = data.folders.filter {
+                BrowseSearch.matches(terms, fields: [$0.name, $0.url.path]) ||
+                    $0.tracks.contains { $0.matches(query) }
+            }.sorted {
+                let comparison = $0.name.localizedStandardCompare($1.name)
+                if comparison == .orderedSame { return $0.id.path < $1.id.path }
+                return comparison == (sortByName ? .orderedAscending : .orderedDescending)
+            }
+            let matches = data.directTracks.filter { $0.matches(query) && filters.matches($0) }
+            return (folders: folders, tracks: trackSort.sorted(matches))
         }
-        let tracks = trackSort.sorted(matches)
+        let descendants = data.descendants
+        let folders = result.folders
+        let tracks = result.tracks
         Group {
             if folders.isEmpty, tracks.isEmpty {
                 BrowseEmpty(
@@ -144,35 +160,50 @@ struct FolderBrowserPage: View {
         return file.standardizedFileURL.path.hasPrefix(folder.hasSuffix("/") ? folder : folder + "/")
     }
 
-    private func entries(for folder: URL?, descendants: [AudioTrack]) -> [Folder] {
-        let entries: [Folder]
-        if let folder {
-            let directory = folder.standardizedFileURL.path
-            let prefix = directory.hasSuffix("/") ? directory : directory + "/"
-            let grouped = Dictionary(grouping: descendants) { track in
-                track.url.standardizedFileURL.path.dropFirst(prefix.count).split(separator: "/", maxSplits: 1)
-            }
-            var children: [String: [AudioTrack]] = [:]
-            for (path, tracks) in grouped where path.count > 1 {
-                children[String(path[0]), default: []].append(contentsOf: tracks)
-            }
-            entries = children.map { name, tracks in
-                Folder(url: folder.appendingPathComponent(name, isDirectory: true), name: name, tracks: tracks)
-            }
-        } else {
-            entries = library.sources.map { source in
-                let url = source.url.standardizedFileURL
-                return Folder(
-                    url: url, name: source.name,
-                    tracks: library.tracks.filter { belongs($0.url, to: url) },
-                    detail: source.status == .unavailable ? String(localized: "Unavailable") : nil
-                )
-            }
+    private func sourceFolders() -> [Folder] {
+        library.sources.map { source in
+            let url = source.url.standardizedFileURL
+            return Folder(
+                url: url, name: source.name,
+                tracks: library.tracks.filter { belongs($0.url, to: url) },
+                detail: source.status == .unavailable ? String(localized: "Unavailable") : nil
+            )
         }
-        return entries.sorted {
-            let comparison = $0.name.localizedStandardCompare($1.name)
-            if comparison == .orderedSame { return $0.id.path < $1.id.path }
-            return comparison == (sortByName ? .orderedAscending : .orderedDescending)
+    }
+
+    private struct DataKey: Equatable {
+        let revision: Int
+        let folder: URL?
+        let sources: [LibrarySource]
+    }
+
+    private struct FilterKey: Equatable {
+        let query: String
+        let sortByName: Bool
+        let trackSort: TrackSortOrder
+        let filters: OfflineTrackFilters
+    }
+
+    private final class FolderCache {
+        typealias Data = (descendants: [AudioTrack], directTracks: [AudioTrack], folders: [Folder])
+        typealias Result = (folders: [Folder], tracks: [AudioTrack])
+
+        private var base: (key: DataKey, data: Data)?
+        private var display: (key: FilterKey, result: Result)?
+
+        func data(for key: DataKey, build: () -> Data) -> Data {
+            if let base, base.key == key { return base.data }
+            let data = build()
+            base = (key, data)
+            display = nil
+            return data
+        }
+
+        func result(for key: FilterKey, build: () -> Result) -> Result {
+            if let display, display.key == key { return display.result }
+            let result = build()
+            display = (key, result)
+            return result
         }
     }
 
@@ -191,5 +222,33 @@ struct FolderBrowserPage: View {
 
         var id: URL { url }
         var detail: String { detailOverride ?? trackCount(tracks.count) }
+    }
+}
+
+nonisolated struct FolderListing: Sendable {
+    let descendants: [AudioTrack]
+    let directTracks: [AudioTrack]
+    let children: [String: [AudioTrack]]
+
+    init(folder: URL, tracks: [AudioTrack]) {
+        let directory = folder.standardizedFileURL.path
+        let prefix = directory.hasSuffix("/") ? directory : directory + "/"
+        var descendants: [AudioTrack] = []
+        var direct: [AudioTrack] = []
+        var children: [String: [AudioTrack]] = [:]
+        for track in tracks {
+            let path = track.url.standardizedFileURL.path
+            guard path.hasPrefix(prefix) else { continue }
+            descendants.append(track)
+            let relative = path.dropFirst(prefix.count)
+            if let slash = relative.firstIndex(of: "/") {
+                children[String(relative[..<slash]), default: []].append(track)
+            } else {
+                direct.append(track)
+            }
+        }
+        self.descendants = descendants
+        directTracks = direct
+        self.children = children
     }
 }

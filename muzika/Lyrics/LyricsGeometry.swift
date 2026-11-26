@@ -4,7 +4,7 @@ nonisolated enum LyricsScrollTiming {
     static let manualHold: Double = 4
 }
 
-struct LyricsScrollGeometry {
+nonisolated struct LyricsScrollGeometry: Sendable {
     let anchor: CGFloat
     let gapExtent: CGFloat
     private let viewportHeight: CGFloat
@@ -36,6 +36,8 @@ struct LyricsScrollGeometry {
     func y(forRow index: Int, gapBefore: Int?) -> CGFloat {
         topInset + origins[index] + (index >= (gapBefore ?? heights.count) ? gapExtent : 0)
     }
+
+    func height(forRow index: Int) -> CGFloat { heights[index] }
 
     func offset(forRow index: Int, gapBefore: Int?) -> CGFloat {
         y(forRow: index, gapBefore: gapBefore) - anchor
@@ -70,5 +72,30 @@ struct LyricsScrollGeometry {
             else { lower = middle + 1 }
         }
         return lower
+    }
+}
+
+nonisolated struct UntimedLyricsLayout: Sendable {
+    private let geometry: LyricsScrollGeometry
+
+    init(heights: [CGFloat], spacing: CGFloat) {
+        geometry = LyricsScrollGeometry(heights: heights, spacing: spacing, viewportHeight: 0, topOverflow: 0,
+                                        hasLeadingGap: false)
+    }
+
+    var height: CGFloat { geometry.contentHeight(gapBefore: nil) }
+
+    func origin(of row: Int) -> CGFloat {
+        geometry.y(forRow: row, gapBefore: nil)
+    }
+
+    func fitsRenderedRow(height: CGFloat, at row: Int) -> Bool {
+        height <= geometry.height(forRow: row) + 0.5
+    }
+
+    func rows(covering viewport: CGRect) -> Range<Int> {
+        let start = max(0, viewport.minY - viewport.height)
+        let end = max(start, viewport.maxY + viewport.height)
+        return geometry.rows(in: start..<end, gapBefore: nil)
     }
 }

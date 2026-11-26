@@ -2,24 +2,25 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
-report="${1:?Usage: bash Tests/Performance/run.sh ABSOLUTE_REPORT.json [repeats] [ABSOLUTE_TRACE.trace] [suite|home]}"
+report="${1:?Usage: bash Tests/Performance/run.sh ABSOLUTE_REPORT.json [repeats] [ABSOLUTE_TRACE.trace] [suite|home|compositor|stress|stress-compositor]}"
 repeats="${2:-3}"
 trace="${3:-}"
 mode="${4:-suite}"
-case "$mode" in suite|home) ;; *) printf '%s\n' "Unknown performance mode: $mode" >&2; exit 2 ;; esac
-if [[ "$mode" == home && -z "$trace" ]]; then
-    printf '%s\n' "Home scroll verification requires an Instruments trace." >&2
+case "$mode" in suite|home|compositor|stress|stress-compositor) ;; *) printf '%s\n' "Unknown performance mode: $mode" >&2; exit 2 ;; esac
+if [[ "$mode" != suite && -z "$trace" ]]; then
+    printf '%s\n' "$mode verification requires an Instruments trace." >&2
     exit 2
 fi
 case "$report" in /*) ;; *) printf '%s\n' "The report path must be absolute." >&2; exit 2 ;; esac
 scratch="$(mktemp -d /tmp/muzika-performance.XXXXXXXX)"
-python3 - "$root/muzika" "$scratch" <<'PY'
+python3 - "$root/muzika" "$scratch" "$mode" <<'PY'
 from pathlib import Path
 import re
 import sys
 
 source = Path(sys.argv[1])
 sandbox = Path(sys.argv[2])
+stress = sys.argv[3] in {"stress", "stress-compositor"}
 
 def replace(text, before, after):
     if before not in text:
@@ -40,6 +41,11 @@ for file in source.rglob("*.swift"):
     elif file.name in ["HistoryStore.swift", "Preferences.swift", "PreferencesView.swift", "SearchAndListening.swift", "TrackBrowser.swift", "FolderBrowserPage.swift"]:
         text = text.replace("UserDefaults.standard", "BenchmarkDefaults()")
         text = re.sub(r'@AppStorage\(("[^"\n]+")\)', r'@AppStorage(\1, store: BenchmarkDefaults())', text)
+        if stress and file.name == "TrackBrowser.swift":
+            text = replace(text, "private var showsSongs = false", "private var showsSongs = true")
+    elif file.name == "LibraryShell.swift" and stress:
+        text = replace(text, 'private var searchQuery = ""', 'private var searchQuery = "Stress Track"')
+        text = replace(text, "private var searchScope = BrowseSearchScope.all", "private var searchScope = BrowseSearchScope.songs")
     elif file.name == "WaveBackground.swift":
         before = "        buffer.addCompletedHandler { [weak self] completed in\n"
         text = replace(text, before, before + "            PerformanceGPU.record(completed)\n")
@@ -54,7 +60,8 @@ files=()
 while IFS= read -r -d "" file; do files+=("$file"); done < <(find "$scratch" -type f -name '*.swift' -print0)
 xcrun swiftc -O -parse-as-library -swift-version 6 -target arm64-apple-macosx27.0 \
     -Xfrontend -disable-sandbox -module-cache-path "${MUZIKA_PERFORMANCE_MODULE_CACHE:-$scratch/module-cache}" \
-    "$root/Tests/Performance/PerformanceProbe.swift" "$root/Tests/Performance/HomeScrollCheck.swift" "${files[@]}" -o "$scratch/MuzikaPerformance"
+    "$root/Tests/Performance/PerformanceProbe.swift" "$root/Tests/Performance/HomeScrollCheck.swift" \
+    "$root/Tests/Performance/StressScrollCheck.swift" "${files[@]}" -o "$scratch/MuzikaPerformance"
 printf 'Fixture: %s\n' "$scratch"
 if [[ "${MUZIKA_PERFORMANCE_BUILD_ONLY:-0}" == 1 ]]; then exit 0; fi
 if [[ -n "$trace" ]]; then

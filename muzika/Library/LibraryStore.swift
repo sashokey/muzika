@@ -74,7 +74,7 @@ final class LibraryStore {
             scanError = String(localized: "Select a readable local folder.")
             return
         }
-        let source = LibrarySource(url: url)
+        let source = LibrarySource(url: url, lease: lease)
         guard !sources.contains(where: { $0.url.path == source.url.path }) else { return }
         sources.append(source)
         sourceWatcher?.watch(sources)
@@ -265,6 +265,7 @@ final class LibraryStore {
     private nonisolated static func resolveAccess(
         to track: AudioTrack, sources: [LibrarySource], temporaryLease: SecurityScopeLease?
     ) -> (lease: SecurityScopeLease?, updates: [SourceUpdate]) {
+        guard MusicLibraryAccess.currentUser.permittedURL(track.url) != nil else { return (nil, []) }
         let path = track.url.path
         var updates: [SourceUpdate] = []
         for previous in sources where previous.url.containsFile(atPath: path) {
@@ -341,6 +342,7 @@ final class LibraryStore {
         self.files = files
         let deepestFirst = sources.sorted { $0.url.path.count > $1.url.path.count }
         tracks = Self.newestFirst(files.compactMap { id, file in
+            guard !MusicLibraryAccess.currentUser.contains(file.track.url) else { return nil }
             let source = deepestFirst.first { $0.url.containsFile(atPath: id) }
             return source?.status == .ready ? file.track : nil
         })

@@ -1,6 +1,6 @@
 {
-  "version": "v15",
+  "version": "v16",
   "draft": false,
   "prerelease": false,
-  "notes": "- Find **Cover art** in **Settings → Appearance → Layout** and **Continue listening** in **Appearance → Home**.\n- Find **Auto-scroll untimed lyrics** in **Settings → Lyrics → Scrolling**.\n- Find **Spatial audio** with volume and transitions in **Playback → Audio**.\n- Find **Tapping a song** in **Local Library → Browsing**.\n- Open **Listening Statistics** from **Home**.\n\nHome scrolling may still stutter while the **Shuffle** animation is visible.\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
+  "notes": "- Scanning a local music folder skips protected Apple Music library data, preventing the macOS Media & Apple Music permission prompt.\n- Home uses a softer animated glow for **Shuffle** and avoids clipping the glow when it fits in the available space.\n- Improved scrolling in **Folders** and untimed **Lyrics**, and reduced work when displaying and reordering large **Up Next** queues.\n\nThe Home frame-rate target still needs verification with the animation visible.\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
 }

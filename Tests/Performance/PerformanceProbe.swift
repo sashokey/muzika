@@ -67,6 +67,12 @@ enum BenchmarkPaths {
     static var history: URL { scratch.appending(path: "history.json") }
 }
 
+func benchmarkWindowOrigin(window: CGSize, in screen: CGRect) -> CGPoint {
+    let margin: CGFloat = 18
+    return CGPoint(x: max(screen.minX, screen.maxX - window.width - margin),
+                   y: screen.minY + min(margin, max(0, screen.height - window.height)))
+}
+
 private final class PerformanceWindow: NSWindow {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
@@ -145,17 +151,32 @@ enum PerformanceProbe {
     private static func run() async throws {
         let report = URL(filePath: CommandLine.arguments[2])
         let repetitions = max(1, Int(CommandLine.arguments[3]) ?? 3)
-        let homeOnly = CommandLine.arguments.dropFirst(4).first == "home"
-        let actions: [Action] = homeOnly ? [
-            Action("home.shuffle_scroll_down") { try await HomeScrollCheck.run(host: $0.host, window: $0.window, down: true) },
-            Action("home.shuffle_scroll_up") { try await HomeScrollCheck.run(host: $0.host, window: $0.window, down: false) },
-        ] : try benchmarkActions()
+        let mode = CommandLine.arguments.dropFirst(4).first ?? "suite"
+        let stress = mode == "stress" || mode == "stress-compositor"
+        var actions: [Action]
+        if mode == "home" {
+            actions = [
+                Action("home.shuffle_scroll_down") { try await HomeScrollCheck.run(host: $0.host, window: $0.window, down: true) },
+                Action("home.shuffle_scroll_up") { try await HomeScrollCheck.run(host: $0.host, window: $0.window, down: false) },
+            ]
+        } else if stress {
+            actions = stressActions()
+        } else {
+            actions = try benchmarkActions()
+        }
+        if let filter = ProcessInfo.processInfo.environment["MUZIKA_PERFORMANCE_ACTIONS"] {
+            let names = Set(filter.split(separator: ",").map(String.init))
+            actions = actions.filter { names.contains($0.name) }
+            guard !actions.isEmpty, actions.count == names.count else {
+                throw HomeScrollCheck.Failure("Invalid performance action selection")
+            }
+        }
         var results: [BenchmarkSample] = []
         for iteration in 1...repetitions {
-            let fixture = try Fixture()
+            let fixture = try Fixture(stress: stress)
             try await Task.sleep(for: .milliseconds(showsWindow ? 500 : 150))
             fixture.host.layoutSubtreeIfNeeded()
-            try fixture.checkVisibility()
+            try await fixture.waitForVisibility()
             for action in actions {
                 results.append(try await measure(action, iteration: iteration, fixture: fixture))
             }
@@ -168,6 +189,10 @@ enum PerformanceProbe {
 
     private static var showsWindow: Bool {
         ProcessInfo.processInfo.environment["MUZIKA_PERFORMANCE_VISIBLE"] == "1"
+    }
+
+    private static var checksWrappedLyrics: Bool {
+        ProcessInfo.processInfo.environment["MUZIKA_TEST_WRAPPED_LYRICS"] == "1"
     }
 
     private static func measure(_ action: Action, iteration: Int, fixture: Fixture) async throws -> BenchmarkSample {
@@ -240,6 +265,122 @@ enum PerformanceProbe {
             self.name = name
             self.run = run
         }
+    }
+
+    private static func stressActions() -> [Action] {
+        let scrollingPages: [(String, LibraryRoute)] = [
+            ("search", .search), ("recently_added", .recentlyAdded), ("artists", .artists),
+            ("albums", .albums), ("songs", .songs), ("genres", .genres), ("history", .history),
+        ]
+        let lists = scrollingPages.map { name, route in
+            Action("stress.\(name)") { fixture in
+                fixture.state.navigate(route)
+                try await fixture.scrollLargePage(name)
+            }
+        }
+        let detailPages = ["artist", "album", "genre"].map { name in
+            Action("stress.\(name)_tracks") { fixture in
+                guard let route = fixture.largeGroupRoutes[name] else {
+                    throw HomeScrollCheck.Failure("Missing \(name) fixture with 5,000 tracks")
+                }
+                try await fixture.navigateAndScroll(route, name: name, table: true)
+            }
+        }
+        let summaryPages: [(String, LibraryRoute)] = [
+            ("home", .home), ("library_sources", .folders), ("statistics", .statistics),
+            ("rewind", .rewind), ("settings", .settings),
+        ]
+        let summaries = summaryPages.map { name, route in Action("stress.\(name)") { $0.state.navigate(route) } }
+        let settings = PreferencesPage.allCases.map { page in
+            Action("stress.settings.\(page.rawValue)") { $0.state.settingsPage = page }
+        }
+        return lists + detailPages + [
+            Action("stress.folders") { fixture in
+                try await fixture.navigateAndScroll(.folder(fixture.rootFolder), name: "Folders", table: false)
+            },
+            Action("stress.folder_tracks") { fixture in
+                let folder = fixture.rootFolder.appending(path: "Large Collection")
+                try await fixture.navigateAndScroll(.folder(folder), name: "Folder tracks", table: true)
+            },
+        ] + summaries + settings + [
+            Action("stress.now_playing.lyrics_timed") { fixture in
+                let track = fixture.media[0]
+                try await fixture.validateLyrics(track, timed: true)
+                fixture.playPaused(track, in: [track])
+                fixture.state.togglePanel(.lyrics)
+                let view = try await StressScrollCheck.longScroll(in: fixture.host, name: "Timed Lyrics") {
+                    $0 is TimedLyricsScrollView
+                }
+                try await StressScrollCheck.scroll(view, name: "Timed Lyrics")
+            },
+            Action("stress.now_playing.lyrics_seek") { fixture in
+                let view = try await StressScrollCheck.longScroll(in: fixture.host, name: "Timed Lyrics") {
+                    $0 is TimedLyricsScrollView
+                }
+                fixture.state.playback.seek(to: 45)
+                try await Task.sleep(for: .milliseconds(550))
+                guard view.contentView.bounds.minY >= 20_000 else {
+                    throw HomeScrollCheck.Failure("Lyrics did not reveal the late cue after seeking")
+                }
+            },
+            Action("stress.now_playing.lyrics_untimed") { fixture in
+                let track = fixture.media[1]
+                try await fixture.validateLyrics(track, timed: false)
+                fixture.playPaused(track, in: [track])
+                let view = try await StressScrollCheck.longScroll(in: fixture.host, name: "Untimed Lyrics") {
+                    !($0 is TimedLyricsScrollView)
+                }
+                try await StressScrollCheck.scroll(view, name: "Untimed Lyrics")
+                if checksWrappedLyrics {
+                    let initialWidth = view.contentSize.width
+                    fixture.window.setContentSize(NSSize(width: 860, height: 860))
+                    if let screen = fixture.window.screen {
+                        fixture.window.setFrameOrigin(benchmarkWindowOrigin(window: fixture.window.frame.size,
+                                                                           in: screen.visibleFrame))
+                    }
+                    try await Task.sleep(for: .milliseconds(550))
+                    let resized = try await StressScrollCheck.longScroll(in: fixture.host, name: "Wrapped Lyrics after resize") {
+                        !($0 is TimedLyricsScrollView) && $0.contentSize.width < initialWidth - 40
+                    }
+                    try await StressScrollCheck.scroll(resized, name: "Wrapped Lyrics after resize")
+                }
+            },
+            Action("stress.now_playing.up_next") { fixture in
+                let previous = Set(StressScrollCheck.scrollViews(in: fixture.host).map(ObjectIdentifier.init))
+                let current = fixture.media[0]
+                let upcoming = fixture.state.library.tracks.lazy.filter { $0.id != current.id }
+                    .prefix(StressScrollCheck.itemCount)
+                fixture.playPaused(current, in: [current] + Array(upcoming))
+                let queue = fixture.state.playback
+                guard let currentEntry = queue.queue.first,
+                      queue.currentEntryID == currentEntry.id,
+                      queue.queue.count == StressScrollCheck.itemCount + 1 else {
+                    throw HomeScrollCheck.Failure("Up Next did not load 5,000 upcoming tracks")
+                }
+                fixture.state.togglePanel(.queue)
+                guard fixture.state.showingPlayer, fixture.state.panel == .queue else {
+                    throw HomeScrollCheck.Failure("Up Next did not become the active panel")
+                }
+                let scroll = try await StressScrollCheck.longScroll(in: fixture.host, name: "Up Next") { scroll in
+                    guard !previous.contains(ObjectIdentifier(scroll)), !(scroll is TimedLyricsScrollView),
+                          scroll.convert(scroll.bounds, to: fixture.host).minX >= fixture.host.bounds.width * 0.4
+                    else { return false }
+                    if let table = scroll.documentView as? NSTableView {
+                        return table.numberOfRows >= StressScrollCheck.itemCount
+                    }
+                    return true
+                }
+                try await StressScrollCheck.scroll(scroll, name: "Up Next")
+            },
+            Action("stress.now_playing.up_next_move") { fixture in
+                let queue = fixture.state.playback
+                guard let last = queue.queue.last else { throw HomeScrollCheck.Failure("Up Next is empty") }
+                queue.move(from: IndexSet(integer: queue.queue.count - 1), to: 1)
+                guard queue.queue[1].id == last.id else {
+                    throw HomeScrollCheck.Failure("Up Next did not reorder the last of 5,000 upcoming tracks")
+                }
+            },
+        ]
     }
 
     private static func benchmarkActions() throws -> [Action] {
@@ -422,35 +563,57 @@ enum PerformanceProbe {
         let groupIndex = LibraryGroupIndex()
         let importFolder: URL
         let artwork: URL
+        let rootFolder: URL
+        let largeGroupRoutes: [String: LibraryRoute]
         var checksum = 0
 
-        init() throws {
+        init(stress: Bool) throws {
             let manager = FileManager.default
             let dir = BenchmarkPaths.scratch.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+            rootFolder = dir
             try manager.createDirectory(at: dir, withIntermediateDirectories: true)
             importFolder = dir.appending(path: "import", directoryHint: .isDirectory)
             try manager.createDirectory(at: importFolder, withIntermediateDirectories: true)
             try Fixture.waveFile().write(to: importFolder.appending(path: "New.wav"))
             artwork = dir.appending(path: "Cover.png")
             try Fixture.coverImage().write(to: artwork)
-            for index in 0..<4 {
-                try Fixture.waveFile().write(to: dir.appending(path: "Fixture-\(index).wav"))
+            let count = StressScrollCheck.itemCount
+            func trackURL(_ index: Int) -> URL {
+                let ext = index < 4 ? "wav" : "flac"
+                let folder = stress ? dir.appending(path: index < count ? "Collection \(index)" : "Large Collection") : dir
+                return folder.appending(path: "Fixture-\(index).\(ext)")
             }
-            let timedLyrics = (0..<40).map { index -> String in
-                let timestamp = index * 25
+            for index in 0..<4 {
+                let audio = trackURL(index)
+                try manager.createDirectory(at: audio.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try Fixture.waveFile(seconds: stress && index == 0 ? 55 : 12).write(to: audio)
+            }
+            let timedLyrics = (0..<(stress ? count : 40)).map { index -> String in
+                let timestamp = index * (stress ? 1 : 25)
                 return String(format: "[00:%02d.%02d]Fixture lyric line %d", timestamp / 100, timestamp % 100, index)
             }.joined(separator: "\n")
             try timedLyrics.write(
-                to: dir.appending(path: "Fixture-0.lrc"), atomically: true, encoding: .utf8
+                to: trackURL(0).deletingPathExtension().appendingPathExtension("lrc"), atomically: true, encoding: .utf8
             )
-            let tracks = (0..<1590).map { index in
-                let ext = index < 4 ? "wav" : "flac"
-                let url = dir.appending(path: "Fixture-\(index).\(ext)")
+            if stress {
+                let untimed = (0..<count).map { index in
+                    let text = "Untimed fixture lyric line \(index)"
+                    return PerformanceProbe.checksWrappedLyrics && index.isMultiple(of: 3)
+                        ? text + String(repeating: " — Édition 🎵 عربية Русский", count: 8) : text
+                }.joined(separator: "\n")
+                try untimed.write(to: trackURL(1).deletingPathExtension().appendingPathExtension("lrc"),
+                                  atomically: true, encoding: .utf8)
+            }
+            let tracks = (0..<(stress ? count * 2 : 1_590)).map { index in
+                let url = trackURL(index)
+                let artist = stress ? min(index, count) : index % 231
+                let album = stress ? min(index, count) : index % 302
+                let genre = stress ? min(index, count) : index % 15
                 return AudioTrack(
-                    id: url.path, url: url, title: "Track \(index) Édition", artist: "Artist \(index % 231)",
-                    album: "Album \(index % 302)", albumArtist: "Artist \(index % 231)",
-                    genre: "Genre \(index % 15)", discNumber: 1, trackNumber: index % 17 + 1,
-                    year: 2022, duration: index < 4 ? 12 : Double(180 + index % 151),
+                    id: url.path, url: url, title: stress ? "Stress Track \(index)" : "Track \(index) Édition",
+                    artist: "Artist \(artist)", album: "Album \(album)", albumArtist: "Artist \(artist)",
+                    genre: "Genre \(genre)", discNumber: 1, trackNumber: index % 17 + 1,
+                    year: 2022, duration: index < 4 ? (stress && index == 0 ? 55 : 12) : Double(180 + index % 151),
                     codec: index < 4 ? "PCM" : "FLAC", bitDepth: 16, sampleRate: 48_000, bitrate: nil,
                     channels: 1, addedAt: .distantPast.addingTimeInterval(Double(index)), isTemporary: false
                 )
@@ -461,8 +624,33 @@ enum PerformanceProbe {
                 files: tracks.map { IndexedAudioFile(track: $0, stamp: nil) }
             )
             try JSONEncoder().encode(contents).write(to: BenchmarkPaths.library, options: .atomic)
-            try Data("[]".utf8).write(to: BenchmarkPaths.history, options: .atomic)
+            let history = stress ? tracks.prefix(count).enumerated().map { index, track in
+                ListeningEvent(trackID: track.id, timestamp: .now.addingTimeInterval(-Double(index)),
+                               title: track.title, artist: track.artist, seconds: 25, started: true)
+            } : []
+            try JSONEncoder().encode(history).write(to: BenchmarkPaths.history, options: .atomic)
             state = AppState()
+            if stress {
+                guard let snapshot = LibraryBrowseSnapshot(tracks: state.library.tracks),
+                      snapshot.songs.count == count * 2, state.history.events.count == count,
+                      snapshot.recentAlbums.count >= count else {
+                    throw HomeScrollCheck.Failure("Stress fixture did not restore the large library and history")
+                }
+                var routes: [String: LibraryRoute] = [:]
+                for (name, groups) in [("artist", snapshot.artists), ("album", snapshot.albums), ("genre", snapshot.genres)] {
+                    guard groups.count >= count, let large = groups.first(where: { $0.tracks.count == count }) else {
+                        throw HomeScrollCheck.Failure("Stress fixture did not provide 5,000 \(name) groups and a 5,000-track group")
+                    }
+                    routes[name] = large.route
+                }
+                let folders = Set(state.library.tracks.map { $0.url.deletingLastPathComponent() })
+                guard folders.count >= count else {
+                    throw HomeScrollCheck.Failure("Stress fixture did not provide 5,000 folder entries")
+                }
+                largeGroupRoutes = routes
+            } else {
+                largeGroupRoutes = [:]
+            }
             host = NSHostingView(rootView: AnyView(
                 MainWindow(state: state)
                     .environment(\.scenePhase, PerformanceProbe.showsWindow ? .active : .inactive)
@@ -479,26 +667,66 @@ enum PerformanceProbe {
             if PerformanceProbe.showsWindow {
                 window.alphaValue = 1
                 window.level = .floating
-                window.collectionBehavior.insert(.canJoinAllSpaces)
+                window.collectionBehavior.formUnion([.canJoinAllSpaces, .fullScreenAuxiliary])
             } else {
                 window.alphaValue = 0
             }
             window.center()
+            if let screen = window.screen ?? NSScreen.main {
+                window.setFrameOrigin(benchmarkWindowOrigin(window: window.frame.size, in: screen.visibleFrame))
+            }
             window.orderFrontRegardless()
         }
 
         isolated deinit { window.orderOut(nil) }
 
+        func waitForVisibility() async throws {
+            guard PerformanceProbe.showsWindow else { return }
+            for _ in 0..<20 where !window.occlusionState.contains(.visible) {
+                window.orderFrontRegardless()
+                try await Task.sleep(for: .milliseconds(100))
+            }
+            try checkVisibility()
+        }
+
         func checkVisibility() throws {
             if PerformanceProbe.showsWindow,
                (!window.occlusionState.contains(.visible) || window.isKeyWindow) {
                 throw HomeScrollCheck.Failure(
-                    "Performance window: ordered=\(window.isVisible), visible=\(window.occlusionState.contains(.visible)), key=\(window.isKeyWindow)"
+                    "Performance window: ordered=\(window.isVisible), visible=\(window.occlusionState.contains(.visible)), key=\(window.isKeyWindow), frame=\(window.frame), screen=\(String(describing: window.screen?.visibleFrame))"
                 )
             }
         }
 
         func consume(_ tracks: [AudioTrack]) { checksum = tracks.first?.id.hashValue ?? tracks.count }
+
+        func scrollLargePage(_ name: String) async throws {
+            let scroll = try await StressScrollCheck.longScroll(in: host, name: name)
+            try await StressScrollCheck.scroll(scroll, name: name)
+        }
+
+        func validateLyrics(_ track: AudioTrack, timed: Bool) async throws {
+            let lyrics = try await state.library.lyrics(for: track)
+            guard lyrics?.lines.count == StressScrollCheck.itemCount, lyrics?.isTimed == timed else {
+                throw HomeScrollCheck.Failure("Lyrics did not load the \(timed ? "timed" : "untimed") 5,000-line fixture")
+            }
+        }
+
+        func navigateAndScroll(_ route: LibraryRoute, name: String, table: Bool) async throws {
+            let previous = Set(StressScrollCheck.scrollViews(in: host).map(ObjectIdentifier.init))
+            state.navigate(route)
+            let scroll = try await StressScrollCheck.longScroll(in: host, name: name) { scroll in
+                guard !previous.contains(ObjectIdentifier(scroll)) else { return false }
+                let rows = (scroll.documentView as? NSTableView)?.numberOfRows
+                return table ? rows == StressScrollCheck.itemCount : rows == nil
+            }
+            try await StressScrollCheck.scroll(scroll, name: name)
+        }
+
+        func playPaused(_ track: AudioTrack, in queue: [AudioTrack]) {
+            state.playback.play(track, in: queue)
+            if state.playback.playing { state.playback.togglePlayback() }
+        }
 
         func lyricsScrollView() throws -> NSScrollView {
             func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
@@ -572,8 +800,8 @@ enum PerformanceProbe {
             return png
         }
 
-        private static func waveFile() -> Data {
-            let byteCount: UInt32 = 48_000 * 12 * 2
+        private static func waveFile(seconds: UInt32 = 12) -> Data {
+            let byteCount = 48_000 * seconds * 2
             var output = Data()
             func text(_ value: String) { output.append(contentsOf: value.utf8) }
             func number<T: FixedWidthInteger>(_ value: T) {

@@ -417,19 +417,19 @@ private struct QueuePanel: View {
                         }
                         .onMove { offsets, destination in
                             guard !playback.queueLocked else { return }
-                            let global = IndexSet(offsets.compactMap {
-                                guard visibleQueue.indices.contains($0) else { return nil }
-                                return playback.queue.firstIndex(of: visibleQueue[$0])
-                            })
-                            let target = visibleQueue.indices.contains(destination)
-                                ? playback.queue.firstIndex(of: visibleQueue[destination]) ?? playback.queue.count
-                                : playback.queue.count
+                            let positions = QueueOffsets(indices: visibleQueue.indices)
+                            let global = IndexSet(offsets.compactMap(positions.index))
+                            guard global.count == offsets.count, let target = positions.insertionIndex(destination) else {
+                                return
+                            }
                             playback.move(from: global, to: target)
                         }
                         .onDelete { offsets in
                             guard !playback.queueLocked else { return }
                             let rows = visibleQueue
-                            offsets.filter { rows.indices.contains($0) }.forEach { playback.remove(rows[$0]) }
+                            let positions = QueueOffsets(indices: rows.indices)
+                            let entries = offsets.compactMap { positions.index($0).map { rows[$0] } }
+                            entries.forEach { playback.remove($0) }
                         }
                         if upcoming.isEmpty {
                             Text("No upcoming tracks").foregroundStyle(.secondary)
@@ -497,12 +497,12 @@ private struct QueuePanel: View {
         #endif
     }
 
-    private func artworkWindow(in upcoming: [QueueEntry]) -> [AudioTrack] {
+    private func artworkWindow(in upcoming: ArraySlice<QueueEntry>) -> [AudioTrack] {
         guard !upcoming.isEmpty else { return [] }
         let lastPage = (upcoming.count - 1) / Self.artworkPageSize
-        let first = min(artworkPage, lastPage) * Self.artworkPageSize
-        let end = min(upcoming.count, first + Self.artworkLookahead)
-        let behind = max(0, first - Self.artworkPageSize * 2)
+        let first = upcoming.startIndex + min(artworkPage, lastPage) * Self.artworkPageSize
+        let end = min(upcoming.endIndex, first + Self.artworkLookahead)
+        let behind = max(upcoming.startIndex, first - Self.artworkPageSize * 2)
         var seen = Set<AudioTrack.ID>()
         return (upcoming[first..<end].map(\.track) + upcoming[behind..<first].map(\.track))
             .filter { seen.insert($0.id).inserted }
@@ -522,9 +522,10 @@ private struct QueuePanel: View {
         }
     }
 
-    private var visibleQueue: [QueueEntry] {
-        guard let index = playback.queue.firstIndex(where: { $0.id == playback.currentEntryID }) else { return playback.queue }
-        return Array(playback.queue.dropFirst(index + 1))
+    private var visibleQueue: ArraySlice<QueueEntry> {
+        let queue = playback.queue
+        guard let index = queue.firstIndex(where: { $0.id == playback.currentEntryID }) else { return queue[...] }
+        return queue.suffix(from: index + 1)
     }
 
     private func sectionHeader(_ title: LocalizedStringKey) -> some View {
@@ -539,13 +540,9 @@ private struct QueuePanel: View {
             }
     }
 
-    private func canMove(_ entry: QueueEntry, delta: Int) -> Bool {
-        guard let index = visibleQueue.firstIndex(of: entry) else { return false }
-        return visibleQueue.indices.contains(index + delta)
-    }
-
     private func move(_ entry: QueueEntry, delta: Int) {
-        guard canMove(entry, delta: delta), let index = playback.queue.firstIndex(of: entry) else { return }
+        let rows = visibleQueue
+        guard let index = rows.firstIndex(of: entry), rows.indices.contains(index + delta) else { return }
         playback.move(from: IndexSet(integer: index), to: index + (delta > 0 ? 2 : -1))
     }
 }

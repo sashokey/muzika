@@ -2,6 +2,19 @@ import AVFoundation
 import Foundation
 import MediaToolbox
 
+nonisolated struct QueueOffsets: Sendable {
+    let indices: Range<Int>
+
+    func index(_ offset: Int) -> Int? {
+        guard offset >= 0, offset < indices.count else { return nil }
+        return indices.lowerBound + offset
+    }
+
+    func insertionIndex(_ offset: Int) -> Int? {
+        offset == indices.count ? indices.upperBound : index(offset)
+    }
+}
+
 @MainActor
 final class QueuePlayback: PlaybackTransport {
     private let player = AVQueuePlayer()

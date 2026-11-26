@@ -95,17 +95,18 @@ nonisolated struct LibrarySource: Identifiable, Codable, Hashable, Sendable {
         url.lastPathComponent.isEmpty ? url.path : url.lastPathComponent
     }
 
-    init(url: URL) {
-        let lease = SecurityScopeLease(url: url)
+    init(url: URL, lease existingLease: SecurityScopeLease? = nil) {
+        let lease = existingLease ?? SecurityScopeLease(url: url)
         self.id = UUID()
-        self.url = url.canonicalized
-        self.bookmark = SecurityScopeLease.bookmark(for: url)
-        self.status = .ready
+        self.url = lease?.canonicalURL ?? url
+        self.bookmark = lease?.bookmark()
+        self.status = lease == nil ? .unavailable : .ready
         self.trackCount = 0
         withExtendedLifetime(lease) {}
     }
 
     mutating func open() -> SecurityScopeLease? {
+        guard !MusicLibraryAccess.currentUser.contains(url) else { return nil }
         guard let bookmark else { return SecurityScopeLease(url: url) }
         var stale = false
         guard let resolved = try? URL(
@@ -116,8 +117,8 @@ nonisolated struct LibrarySource: Identifiable, Codable, Hashable, Sendable {
         ), let lease = SecurityScopeLease(url: resolved) else {
             return SecurityScopeLease(url: url)
         }
-        url = resolved.canonicalized
-        if stale, let renewed = SecurityScopeLease.bookmark(for: resolved) {
+        url = lease.canonicalURL
+        if stale, let renewed = lease.bookmark() {
             self.bookmark = renewed
         }
         return lease
@@ -130,17 +131,20 @@ nonisolated struct LibrarySource: Identifiable, Codable, Hashable, Sendable {
 }
 
 nonisolated final class SecurityScopeLease: Sendable {
+    let canonicalURL: URL
     private let url: URL
     private let scoped: Bool
 
     init?(url: URL) {
+        guard let canonicalURL = MusicLibraryAccess.currentUser.permittedURL(url) else { return nil }
         let scoped = url.startAccessingSecurityScopedResource()
         guard scoped || FileManager.default.isReadableFile(atPath: url.path) else { return nil }
+        self.canonicalURL = canonicalURL
         self.url = url
         self.scoped = scoped
     }
 
-    static func bookmark(for url: URL) -> Data? {
+    func bookmark() -> Data? {
         try? url.bookmarkData(
             options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess],
             includingResourceValuesForKeys: nil,
@@ -152,6 +156,59 @@ nonisolated final class SecurityScopeLease: Sendable {
         if scoped {
             url.stopAccessingSecurityScopedResource()
         }
+    }
+}
+
+nonisolated struct MusicLibraryAccess: Sendable {
+    static let currentUser = Self(home: accountHome() ?? .homeDirectory)
+
+    private let roots: [String]
+
+    init(home: URL) {
+        roots = ["Music/Music", "Music/iTunes", "Library/Containers/com.apple.Music"].map {
+            Self.lexicalPath(home.appending(path: $0).path)
+        }
+    }
+
+    func contains(_ url: URL) -> Bool {
+        guard url.isFileURL else { return false }
+        let path = Self.lexicalPath(url.path)
+        if roots.contains(where: { path == $0 || path.hasPrefix($0 + "/") }) { return true }
+        guard path.contains(".musiclibrary") else { return false }
+        return path.split(separator: "/").contains { $0.hasSuffix(".musiclibrary") }
+    }
+
+    func permittedURL(_ url: URL) -> URL? {
+        guard url.isFileURL, !contains(url) else { return nil }
+        let resolved = url.canonicalized
+        return contains(resolved) ? nil : resolved
+    }
+
+    private static func accountHome() -> URL? {
+        var record = passwd()
+        var result: UnsafeMutablePointer<passwd>?
+        let suggestedSize = sysconf(_SC_GETPW_R_SIZE_MAX)
+        var buffer = [CChar](repeating: 0, count: max(suggestedSize, 4_096))
+        return buffer.withUnsafeMutableBufferPointer { bytes in
+            guard getpwuid_r(getuid(), &record, bytes.baseAddress, bytes.count, &result) == 0,
+                  let home = result?.pointee.pw_dir else { return nil }
+            return URL(filePath: String(cString: home), directoryHint: .isDirectory)
+        }
+    }
+
+    private static func lexicalPath(_ value: String) -> String {
+        let path = value.lowercased()
+        guard path.contains("/./") || path.contains("/../") || path.contains("//") ||
+                path.hasSuffix("/.") || path.hasSuffix("/..") || path.hasSuffix("/") else { return path }
+        var components: [Substring] = []
+        for component in path.split(separator: "/") {
+            switch component {
+            case ".": continue
+            case "..": if !components.isEmpty { components.removeLast() }
+            default: components.append(component)
+            }
+        }
+        return "/" + components.joined(separator: "/")
     }
 }
 

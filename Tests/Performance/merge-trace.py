@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 import sys
 from xml.etree.ElementTree import iterparse
+from trace_metrics import cpu_percent, gpu_usage
 
 
 def rows(path, columns):
@@ -54,16 +55,6 @@ def gpu_intervals(path, targets):
     return result
 
 
-def busy_milliseconds(intervals, lower, upper):
-    clipped = sorted((max(start, lower), min(end, upper)) for start, end in intervals if start < upper and end > lower)
-    last = lower
-    total = 0
-    for start, end in clipped:
-        total += max(0, end - max(start, last))
-        last = max(last, end)
-    return total / 1_000_000
-
-
 def main():
     report, signposts, gpu = map(Path, sys.argv[1:4])
     samples = json.loads(report.read_text())
@@ -89,8 +80,13 @@ def main():
             if next_start <= lower or upper > next_start + 2_000_000:
                 raise ValueError("Timestamped action windows are out of order or overlap")
             upper = min(upper, next_start)
-        samples[index]["xcode"] = version
-        samples[index]["traceGPUActiveMilliseconds"] = busy_milliseconds(gpu_events.get(target, []), lower, upper)
+        gpu_ms, gpu_percent = gpu_usage(gpu_events.get(target, []), lower, upper)
+        samples[index].update(
+            xcode=version,
+            cpuPercentOfOneCore=cpu_percent(samples[index]),
+            traceGPUActiveMilliseconds=gpu_ms,
+            traceGPUPercent=gpu_percent,
+        )
 
     report.write_text(json.dumps(samples, indent=2) + "\n")
     print(f"Merged app-process GPU execution time into {len(samples)} samples")

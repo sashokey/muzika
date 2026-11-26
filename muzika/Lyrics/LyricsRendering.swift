@@ -17,17 +17,17 @@ nonisolated struct LyricsTypography: Equatable, Sendable {
     var containerWidth: CGFloat { wide ? min(width, 750) : width }
     var textWidth: CGFloat { max(1, containerWidth - 2 * horizontalInset) }
 
-    func blocks(for line: LyricsLine) -> [LyricsTextBlock] {
+    func blocks(for line: LyricsLine, untimed: Bool = false) -> [LyricsTextBlock] {
         var blocks: [LyricsTextBlock] = []
         if let pronunciation = line.pronunciation {
             blocks.append(LyricsTextBlock(text: pronunciation, words: line.pronunciationWords, size: auxiliarySize,
                                           weight: .medium, isPrimary: false))
         }
         blocks.append(LyricsTextBlock(text: line.text, words: line.words, size: textSize * (line.isBackground ? 0.86 : 1),
-                                      weight: .semibold, isPrimary: true))
+                                      weight: untimed ? .medium : .semibold, isPrimary: true))
         if let translation = line.translation {
             blocks.append(LyricsTextBlock(text: translation, words: line.translationWords, size: auxiliarySize,
-                                          weight: .regular, isPrimary: false))
+                                          weight: untimed ? .medium : .regular, isPrimary: false))
         }
         return blocks
     }
