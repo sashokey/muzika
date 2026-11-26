@@ -5,6 +5,8 @@ struct PlayingTrackCredits: View {
     let track: AudioTrack
     let navigate: (LibraryRoute) -> Void
 
+    private static let albumColor = Color.secondary.opacity(0.85)
+
     private struct Segment {
         let text: String
         let route: LibraryRoute?
@@ -13,22 +15,23 @@ struct PlayingTrackCredits: View {
     var body: some View {
         let artists = artistSegments
         let album = Segment(text: track.album, route: track.isTemporary ? nil : BrowseGroup.albumRoute(track.albumKey))
+        let hasAlbumLine = !album.text.isEmpty || track.year != nil
         Group {
             if artists.isEmpty {
-                if !album.text.isEmpty { credit(album).lineLimit(2) }
-            } else if album.text.isEmpty {
+                if hasAlbumLine { albumLine(album, year: track.year).lineLimit(2) }
+            } else if !hasAlbumLine {
                 artistLine(artists).lineLimit(2)
             } else {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 0) {
                         artistLine(artists)
                         Text(verbatim: " · ")
-                        credit(album)
+                        albumLine(album, year: track.year)
                     }
                     .fixedSize(horizontal: true, vertical: false)
                     VStack(alignment: .leading, spacing: 0) {
                         artistLine(artists)
-                        credit(album)
+                        albumLine(album, year: track.year)
                     }
                 }
                 .lineLimit(1)
@@ -67,10 +70,21 @@ struct PlayingTrackCredits: View {
         }
     }
 
+    private func albumLine(_ album: Segment, year: Int?) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 0) {
+            if !album.text.isEmpty { credit(album, restingColor: Self.albumColor) }
+            if let year {
+                Text(verbatim: album.text.isEmpty ? String(year) : " · \(year)")
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+        }
+        .foregroundStyle(Self.albumColor)
+    }
+
     @ViewBuilder
-    private func credit(_ segment: Segment) -> some View {
+    private func credit(_ segment: Segment, restingColor: Color = .secondary) -> some View {
         if let route = segment.route {
-            CreditLink(text: segment.text) { navigate(route) }
+            CreditLink(text: segment.text, restingColor: restingColor) { navigate(route) }
         } else {
             Text(verbatim: segment.text)
         }
@@ -79,6 +93,7 @@ struct PlayingTrackCredits: View {
 
 private struct CreditLink: View {
     let text: String
+    let restingColor: Color
     let action: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -87,7 +102,7 @@ private struct CreditLink: View {
     var body: some View {
         Button(action: action) {
             Text(verbatim: text)
-                .foregroundStyle(hovering ? Color.white : Color.secondary)
+                .foregroundStyle(hovering ? Color.white : restingColor)
                 .animation(reduceMotion ? nil : GlassHoverMotion.appearance, value: hovering)
         }
         .buttonStyle(.plain)
