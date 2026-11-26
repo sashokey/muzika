@@ -1,6 +1,6 @@
 {
-  "version": "v12",
+  "version": "v13",
   "draft": false,
   "prerelease": false,
-  "notes": "- Remove the extra blurred band above the Home heading when scrolling.\n\nKnown issue: Home scrolling may still stutter while the Shuffle animation is visible.\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
+  "notes": "- Add **Animated word highlighting** in **Settings → Lyrics → Appearance**. Turn it off to highlight each timed word immediately.\n- Add **Now Playing audio spectrum** in **Settings → Appearance → Effects**. Turn it off to show the static waveform. **Audio info** and **Get Info** work in both modes.\n- Show the release year from track metadata in **Now Playing** when available.\n- Keep the spectrum bars a fixed width as their height follows the audio.\n\nBug reports and feature requests are tracked in [GitHub Issues](https://github.com/sashokey/muzika/issues).\n\nHome scrolling may still stutter while the **Shuffle** animation is visible.\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
 }
