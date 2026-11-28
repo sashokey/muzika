@@ -109,6 +109,7 @@ private struct GroupGridCard: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .buttonPointer()
                 .accessibilityLabel(group.title)
                 .accessibilityHint(group.subtitle)
                 .modifier(ArtworkPlaybackModifier(

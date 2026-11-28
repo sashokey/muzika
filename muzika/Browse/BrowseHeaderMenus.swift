@@ -129,6 +129,7 @@ private struct BrowseHeaderMenuPanel: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .buttonPointer()
         .liquidGlassHover(outset: .zero)
     }
 }

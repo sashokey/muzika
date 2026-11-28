@@ -217,6 +217,7 @@ private struct ArtworkPlaybackControl: View {
             }
         }
         .buttonStyle(.plain)
+        .buttonPointer(when: showsControl)
         .focused($focused)
         .accessibilityLabel(Text(title))
         .opacity(showsControl ? 1 : 0)

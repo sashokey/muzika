@@ -31,6 +31,14 @@ final class NativeGroupCard: NSButton {
 
     override var isFlipped: Bool { true }
 
+    override var isEnabled: Bool {
+        didSet {
+            if isEnabled != oldValue {
+                window?.invalidateCursorRects(for: self)
+            }
+        }
+    }
+
     init() {
         super.init(frame: .zero)
         title = ""
@@ -55,6 +63,14 @@ final class NativeGroupCard: NSButton {
     required init?(coder: NSCoder) { nil }
 
     isolated deinit { loadTask?.cancel() }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        let rect = bounds.intersection(visibleRect)
+        if isEnabled && !isHiddenOrHasHiddenAncestor && !rect.isEmpty {
+            addCursorRect(rect, cursor: .pointingHand)
+        }
+    }
 
     func configure(group: BrowseGroup, library: LibraryStore, playback: PlaybackController, presentation: BrowseGroupPresentation,
                    circular: Bool, frame: CGRect, displayScale: CGFloat, open: @escaping (LibraryRoute) -> Void) {

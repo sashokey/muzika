@@ -25,6 +25,7 @@ struct LibrarySearchField: View {
                 }
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
+                .buttonPointer()
                 .foregroundStyle(.secondary)
                 if showsClearHelp {
                     clear.help(Text(clearTitle))

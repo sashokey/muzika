@@ -25,6 +25,7 @@ struct BrowseTrackRows: View {
                 BrowseTrackRow(library: library, track: track)
             }
             .buttonStyle(.plain)
+            .buttonPointer()
             .modifier(ArtworkPlaybackModifier(
                 library: library, target: .track(track, queue: tracks), playback: playback,
                 layout: .row, effectsTrack: showsPlaybackEffects ? track : nil, beforePlay: beforePlay,
@@ -107,6 +108,7 @@ struct BrowseSongGrid: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .buttonPointer()
                 .modifier(ArtworkPlaybackModifier(
                     library: library, target: .track(track, queue: tracks), playback: playback,
                     layout: .grid, effectsTrack: showsPlaybackEffects ? track : nil, beforePlay: beforePlay,

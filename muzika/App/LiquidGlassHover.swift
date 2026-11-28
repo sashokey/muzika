@@ -264,6 +264,7 @@ private struct GlassHoverButtonSurface: ViewModifier {
             }
             .contentShape(outline)
             .opacity(isEnabled ? 1 : 0.5)
+            .buttonPointer()
         if hoverAppearance != .glass {
             button.stableHover { inside in
                 #if MUZIKA_DEV_LOGS

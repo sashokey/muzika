@@ -110,7 +110,7 @@ private struct CreditLink: View {
                 .animation(reduceMotion ? nil : GlassHoverMotion.appearance, value: hovering)
         }
         .buttonStyle(.plain)
-        .pointerStyle(.link)
+        .buttonPointer()
         .accessibilityAddTraits(.isLink)
         .stableHover { hovering = $0 }
     }

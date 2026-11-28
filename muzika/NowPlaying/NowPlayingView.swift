@@ -206,6 +206,7 @@ struct NowPlayingView: View {
                 }
                 .menuStyle(.button)
                 .buttonStyle(.plain)
+                .buttonPointer()
                 .menuIndicator(.hidden)
                 .frame(width: PlayerIcon.size.width, height: PlayerIcon.size.height)
                 .liquidGlassHover(in: Circle())
@@ -256,6 +257,7 @@ struct NowPlayingView: View {
                 .contentShape(Capsule())
             }
             .buttonStyle(.plain)
+            .buttonPointer()
             .liquidGlassHover(in: Capsule(), outset: .zero)
             .help("Audio info")
             .accessibilityLabel("Audio info, \(track.quality)")
@@ -562,6 +564,7 @@ private struct QueueTrackRow: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .buttonPointer()
             .liquidGlassHover(
                 in: RoundedRectangle(cornerRadius: 8),
                 outset: CGSize(width: 0, height: 1),

@@ -81,6 +81,7 @@ struct PreferencesView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .buttonPointer()
                     .liquidGlassHover(outset: CGSize(width: 6, height: 3))
                 }
                 .listStyle(.sidebar)
@@ -129,6 +130,7 @@ struct PreferencesView: View {
                     Label("Settings", systemImage: "chevron.left")
                 }
                 .buttonStyle(.plain)
+                .buttonPointer()
                 .foregroundStyle(Color.accentColor)
                 .liquidGlassHover(outset: CGSize(width: 6, height: 4))
             }
@@ -416,6 +418,7 @@ private struct LibraryPreferences: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.borderless)
+                        .buttonPointer()
                         .liquidGlassHover(in: Circle(), outset: .zero, stableTracking: true)
                         .accessibilityLabel("Remove library folder")
                     }

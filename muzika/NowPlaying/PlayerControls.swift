@@ -25,6 +25,7 @@ struct PlayerCapsule: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .buttonPointer()
                     .liquidGlassHover(outset: CGSize(width: 3, height: 3))
                     .help("Open Now Playing")
                     .accessibilityLabel("Open Now Playing, \(track.title)")
@@ -102,6 +103,7 @@ struct PlayerIcon: View {
                 .contentShape(Rectangle().scale(x: symbolScale, y: symbolScale))
         }
         .buttonStyle(.plain)
+        .buttonPointer()
         .liquidGlassHover(in: Circle(), scale: hoverScale)
         .accessibilityLabel(title)
         .help(title)

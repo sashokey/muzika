@@ -40,6 +40,7 @@ struct HomeShuffleButton: View {
                     .contentShape(Capsule())
             }
             .buttonStyle(.plain)
+            .buttonPointer()
             .focused($focused)
             .liquidGlassHover(in: Capsule(), outset: .zero, stableTracking: true)
         }

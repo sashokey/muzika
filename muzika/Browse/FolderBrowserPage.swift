@@ -138,6 +138,7 @@ struct FolderBrowserPage: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .buttonPointer()
                     .liquidGlassHover(outset: BrowseTrackRow.hoverOutset)
                     .contextMenu {
                         Button("Open", systemImage: "arrow.right") { navigate(.folder(item.url)) }

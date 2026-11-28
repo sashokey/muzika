@@ -165,6 +165,7 @@ struct LibrarySearchPage: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .buttonPointer()
                 .liquidGlassHover()
                 Divider()
             }
@@ -187,6 +188,7 @@ struct LibrarySearchPage: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .buttonPointer()
                     .liquidGlassHover()
                     Divider()
                 }
@@ -278,6 +280,7 @@ struct LibrarySearchPage: View {
                     scope = destination
                 }
                 .buttonStyle(.plain)
+                .buttonPointer()
                 .foregroundStyle(.tint)
                 .liquidGlassHover(in: .capsule, outset: CGSize(width: 6, height: 3))
             }
@@ -599,6 +602,7 @@ struct ListeningBrowser: View {
                             eventRow(event)
                         }
                         .buttonStyle(.plain)
+                        .buttonPointer()
                         .liquidGlassHover()
                         .contextMenu {
                             PlayTracksMenu(tracks: [track], playback: playback)
@@ -658,6 +662,7 @@ struct ListeningBrowser: View {
                                     BrowseTrackRow(library: library, track: result.track)
                                 }
                                 .buttonStyle(.plain)
+                                .buttonPointer()
                                 .modifier(ArtworkPlaybackModifier(
                                     library: library, target: .track(result.track, queue: rankedTracks),
                                     playback: playback, layout: .row, cardHoverOutset: BrowseTrackRow.hoverOutset

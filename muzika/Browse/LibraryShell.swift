@@ -421,6 +421,7 @@ private struct RecentlyAddedPage: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .buttonPointer()
                 .liquidGlassHover()
             }
         }
