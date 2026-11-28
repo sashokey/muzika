@@ -25,12 +25,6 @@ extension View {
         ))
     }
 
-    func glassHoverMenu() -> some View {
-        menuStyle(.button)
-            .menuIndicator(.hidden)
-            .buttonStyle(GlassHoverButtonStyle(showsMenuIndicator: true))
-    }
-
     func liquidGlassSidebarHover(selectionTint: Bool) -> some View {
         frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .modifier(LiquidGlassHover(
@@ -178,7 +172,6 @@ struct GlassHoverButtonStyle: ButtonStyle {
     var iconSymbol: String?
     var showsMenuIndicator = false
     var hoverAppearance = HoverAppearance.glass
-    var hoverEvent: StaticString?
 
     static func action(
         prominent: Bool = false, iconSymbol: String? = nil, showsMenuIndicator: Bool = false
@@ -186,18 +179,14 @@ struct GlassHoverButtonStyle: ButtonStyle {
         Self(prominent: prominent, iconSymbol: iconSymbol, showsMenuIndicator: showsMenuIndicator, hoverAppearance: .stableGlass)
     }
 
-    static func accent(hoverEvent: StaticString? = nil) -> Self {
-        Self(prominent: true, hoverAppearance: .color, hoverEvent: hoverEvent)
-    }
-
-    static var playback: Self {
-        accent(hoverEvent: "play.hover")
+    static func accent() -> Self {
+        Self(prominent: true, hoverAppearance: .color)
     }
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.modifier(GlassHoverButtonSurface(
             prominent: prominent, iconSymbol: iconSymbol, role: configuration.role, pressed: configuration.isPressed,
-            showsMenuIndicator: showsMenuIndicator, hoverAppearance: hoverAppearance, hoverEvent: hoverEvent
+            showsMenuIndicator: showsMenuIndicator, hoverAppearance: hoverAppearance
         ))
     }
 }
@@ -209,7 +198,6 @@ private struct GlassHoverButtonSurface: ViewModifier {
     let pressed: Bool
     let showsMenuIndicator: Bool
     let hoverAppearance: GlassHoverButtonStyle.HoverAppearance
-    let hoverEvent: StaticString?
     @Environment(\.controlSize) private var controlSize
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -275,11 +263,6 @@ private struct GlassHoverButtonSurface: ViewModifier {
             .buttonPointer()
         if hoverAppearance != .glass {
             button.stableHover { inside in
-                #if MUZIKA_DEV_LOGS
-                if let hoverEvent, hovered != inside {
-                    MuzikaTrace.event(.controls, hoverEvent, "inside=\(inside) enabled=\(isEnabled) animated=\(!reduceMotion)")
-                }
-                #endif
                 hovered = inside
             }
         } else {

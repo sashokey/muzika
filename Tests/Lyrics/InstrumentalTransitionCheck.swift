@@ -34,7 +34,6 @@ private final class InstrumentalTransitionCheck: NSObject, NSApplicationDelegate
     private func checkAndExit() async {
         do {
             try await run()
-            print("Instrumental transition checks passed.")
             exit(0)
         } catch {
             FileHandle.standardError.write(Data("\(error)\n".utf8))

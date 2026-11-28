@@ -286,14 +286,6 @@ private final class LyricsBlockLayer {
         if lineInk != nil {
             let interval = lineFills ? appearance.fillInterval : nil
             if fillInterval != interval {
-                #if MUZIKA_DEV_LOGS
-                if let interval {
-                    MuzikaTrace.event(.lyrics, "line.fill.begin",
-                        "start_s=\(interval.lowerBound) end_s=\(interval.upperBound) fragments=\(lineInk?.fragments.count ?? 0) height_pt=\(layer.bounds.height)")
-                } else {
-                    MuzikaTrace.event(.lyrics, "line.fill.stop", "progress=\(fillProgress ?? 0)")
-                }
-                #endif
                 fillInterval = interval
                 fillProgress = nil
                 current.isHidden = interval == nil
@@ -389,12 +381,6 @@ private final class LyricsBlockLayer {
         let paths = [partial] + times.map { accentMask(at: $0, wholeWord: false) }
         animation.values = paths
         animation.duration = end - position
-        #if MUZIKA_DEV_LOGS
-        if reposition {
-            MuzikaTrace.event(.lyrics, "word.sweep.reposition",
-                "active_words=\(activeWords.count) stops=\(times.count) duration_s=\(animation.duration)")
-        }
-        #endif
         animation.keyTimes = points.map { NSNumber(value: ($0 - position) / animation.duration) }
         animation.calculationMode = .linear
         currentMask.path = paths.last

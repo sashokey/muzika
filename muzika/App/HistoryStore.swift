@@ -78,11 +78,6 @@ final class HistoryStore {
         }
     }
 
-    func last(in library: [AudioTrack]) -> AudioTrack? {
-        let available = Dictionary(library.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        return events.reversed().lazy.compactMap { available[$0.trackID] }.first
-    }
-
     func onRepeat(in library: [AudioTrack]) -> [AudioTrack] {
         let week = Calendar.current.date(byAdding: .day, value: -7, to: .now)
         return rankings(in: library, since: week).filter { $0.count > 1 }.map(\.track)
@@ -113,22 +108,13 @@ final class HistoryStore {
         )
     }
 
-    func clear() {
-        events.removeAll()
-        pendingStart = nil
-        currentEventIndex = nil
-        flush()
-    }
-
     func flush() {
         pendingSave?.cancel()
         pendingSave = nil
         do {
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
             try JSONEncoder().encode(events).write(to: file, options: .atomic)
-        } catch {
-            MuzikaDiagnostics.report("Listening history: \(error.localizedDescription)")
-        }
+        } catch {}
     }
 
     private func events(since: Date?) -> [ListeningEvent] {

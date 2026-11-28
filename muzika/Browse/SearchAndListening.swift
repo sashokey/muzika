@@ -555,7 +555,7 @@ struct ListeningBrowser: View {
                     playback.play(last, in: [last])
                 }
             }
-            .buttonStyle(GlassHoverButtonStyle.playback)
+            .buttonStyle(GlassHoverButtonStyle.accent())
         }
         .padding(12)
         .background(.quaternary.opacity(0.7), in: .rect(cornerRadius: 10))

@@ -41,10 +41,6 @@ nonisolated struct LyricsLine: Identifiable, Sendable, Equatable {
         self.isBackground = isBackground
     }
 
-    func activeWords(at seconds: Double) -> [LyricsWord] {
-        words.filter { $0.isActive(at: seconds) }
-    }
-
     static func knownWordEnd(_ words: [LyricsWord], in text: String) -> Double? {
         guard words.map(\.range.upperBound).max() == text.count,
               words.allSatisfy({ $0.end != nil }) else { return nil }

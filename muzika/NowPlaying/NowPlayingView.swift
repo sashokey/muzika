@@ -48,9 +48,6 @@ struct NowPlayingView: View {
                     prepared: {
                         guard state.showingPlayer else { return false }
                         windowPrepared = true
-                        #if MUZIKA_DEV_LOGS
-                        MuzikaTrace.event(.player, "player.prepared", "opening_animation=\(openingAnimation != nil) panel=\(MuzikaTrace.panelName(state.panel))")
-                        #endif
                         return true
                     }
                 )
@@ -63,29 +60,16 @@ struct NowPlayingView: View {
                 guard !Task.isCancelled else { return }
                 palette = value
                 paletteTrackID = track.id
-                #if MUZIKA_DEV_LOGS
-                MuzikaTrace.event(.player, "cover.palette.ready", "reduce_motion=\(reduceMotion)")
-                #endif
             }
             .task(id: presentation) {
                 guard presentation.panel == .lyrics else { return }
-                #if MUZIKA_DEV_LOGS
-                let loadStarted = CACurrentMediaTime()
-                MuzikaTrace.event(.lyrics, "lyrics.load.begin")
-                #endif
                 if lyricsLoad?.trackID != track.id {
                     lyricsLoad = LyricsLoad(trackID: track.id, status: .loading)
                 }
                 do {
                     let document = try await state.library.lyrics(for: track)
-                    #if MUZIKA_DEV_LOGS
-                    MuzikaTrace.event(.lyrics, "lyrics.load.result", "found=\(document != nil) timed=\(document?.isTimed ?? false) lines=\(document?.lines.count ?? 0) cancelled=\(Task.isCancelled) elapsed_ms=\(((CACurrentMediaTime() - loadStarted) * 1000).rounded())")
-                    #endif
                     if !Task.isCancelled { lyricsLoad = LyricsLoad(trackID: track.id, status: .ready(document)) }
                 } catch {
-                    #if MUZIKA_DEV_LOGS
-                    MuzikaTrace.event(.lyrics, "lyrics.load.failed", "cancelled=\(Task.isCancelled)")
-                    #endif
                     if !Task.isCancelled { lyricsLoad = LyricsLoad(trackID: track.id, status: .failed) }
                 }
             }
@@ -370,9 +354,6 @@ private struct QueuePanel: View {
 
     private static let artworkPageSize = 8
     private static let artworkLookahead = 32
-    #if MUZIKA_DEV_LOGS
-    @State private var scrollState = ScrollPhase.idle
-    #endif
 
     var body: some View {
         let upcoming = visibleQueue
@@ -442,13 +423,6 @@ private struct QueuePanel: View {
                         sectionHeader("Queue")
                     }
                 }
-                #if MUZIKA_DEV_LOGS
-                .onScrollPhaseChange { previous, phase, context in
-                    scrollState = phase
-                    MuzikaTrace.event(.queue, "queue.scroll.phase",
-                        "from=\(previous) to=\(phase) offset_pt=\(context.geometry.contentOffset.y) viewport_pt=\(context.geometry.containerSize.height) content_pt=\(context.geometry.contentSize.height)")
-                }
-                #endif
                 .onScrollGeometryChange(for: Int.self) { geometry in
                     let headerSpace = headerHeight * (hasCurrent ? 2 : 1)
                     let rowCount = upcoming.count + (hasCurrent ? 1 : 0)
@@ -489,16 +463,6 @@ private struct QueuePanel: View {
         .task(id: prefetch.map(\.id), priority: .utility) {
             await prefetchArtwork(prefetch)
         }
-        #if MUZIKA_DEV_LOGS
-        .background {
-            AnimationTraceProbe(area: .queue,
-                state: "revision=\(playback.diagnosticQueueRevision) total=\(playback.queue.count) upcoming=\(upcoming.count) locked=\(playback.queueLocked) scroll=\(scrollState) header_pt=\(headerHeight)")
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-        }
-        .onAppear { MuzikaTrace.event(.queue, "queue.panel.visible", "upcoming=\(upcoming.count)") }
-        .onDisappear { MuzikaTrace.event(.queue, "queue.panel.hidden") }
-        #endif
     }
 
     private func artworkWindow(in upcoming: ArraySlice<QueueEntry>) -> [AudioTrack] {

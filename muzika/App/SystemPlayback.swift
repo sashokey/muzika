@@ -72,12 +72,7 @@ final class SystemPlayback: MediaSessionRepresentable {
                     defer {
                         if self?.session === session { self?.primacy = nil }
                     }
-                    do {
-                        try await session?.requestToBecomeApplicationPrimary()
-                    } catch where !Task.isCancelled {
-                        MuzikaDiagnostics.report("System Now Playing: \(error.localizedDescription)")
-                    } catch {
-                    }
+                    try? await session?.requestToBecomeApplicationPrimary()
                 }
             }
         } else {

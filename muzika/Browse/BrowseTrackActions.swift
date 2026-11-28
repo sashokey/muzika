@@ -67,7 +67,7 @@ struct BrowsePlaybackButtons: View {
     var body: some View {
         HStack(spacing: 10) {
             Button("Play", systemImage: "play.fill") { playback.play(tracks, shuffled: false) }
-                .buttonStyle(GlassHoverButtonStyle.playback)
+                .buttonStyle(GlassHoverButtonStyle.accent())
             Button("Shuffle", systemImage: "shuffle") { playback.play(tracks, shuffled: true) }
                 .buttonStyle(GlassHoverButtonStyle.action())
         }

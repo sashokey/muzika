@@ -1,6 +1,6 @@
 {
-  "version": "v19",
+  "version": "v20",
   "draft": false,
   "prerelease": false,
-  "notes": "- **Done** in track info uses the same hover animation as **Play** in **Songs**.\n- Enabled navigation rows in the library and **Settings** sidebars show a pointing-hand cursor. [#5](https://github.com/sashokey/muzika/issues/5)\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
+  "notes": "- Removed the development builds, diagnostic logging, and unused code.\n- Finder Open With, drag-and-drop, and macOS media controls remain available.\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
 }

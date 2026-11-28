@@ -80,10 +80,6 @@ private final class WaveMetalView: MTKView, MTKViewDelegate {
     var activity = WaveActivity.inactive {
         didSet {
             if activity != oldValue {
-                #if MUZIKA_DEV_LOGS
-                MuzikaTrace.event(.player, "waves.activity", "from=\(oldValue) to=\(activity) target_fps=\(preferredFramesPerSecond)")
-                waveFrames = MuzikaFrameMetrics()
-                #endif
                 updatePresentation()
             }
         }
@@ -97,9 +93,6 @@ private final class WaveMetalView: MTKView, MTKViewDelegate {
     private var presentation = WavePresentation()
     private var pendingFrame: (drawable: any CAMetalDrawable, image: CIImage)?
     private var presentedImage: CIImage?
-    #if MUZIKA_DEV_LOGS
-    private var waveFrames = MuzikaFrameMetrics()
-    #endif
 
     init(device: any MTLDevice, queue: any MTLCommandQueue, framesPerSecond: Int) {
         self.queue = queue
@@ -182,10 +175,6 @@ private final class WaveMetalView: MTKView, MTKViewDelegate {
             }
         }
         buffer.commit()
-        #if MUZIKA_DEV_LOGS
-        waveFrames.record(at: ProcessInfo.processInfo.systemUptime)
-        waveFrames.reportIfReady(.player, "waves.submitted-frames")
-        #endif
     }
 
     @objc private func windowVisibilityChanged(_ notification: Notification) {

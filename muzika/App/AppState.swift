@@ -52,9 +52,6 @@ final class AppState {
     func start() {
         guard !started else { return }
         started = true
-        #if MUZIKA_DEV_LOGS
-        MuzikaTrace.event(.app, "diagnostics.enabled", "configuration=DebugLogs")
-        #endif
         playback.restore()
         if preferences.autoScan == .opening {
             Task { await scan() }
@@ -76,9 +73,6 @@ final class AppState {
     func navigate(_ destination: LibraryRoute) {
         closePlayer()
         if destination != route {
-            #if MUZIKA_DEV_LOGS
-            MuzikaTrace.event(.library, "navigation.change", "from=\(MuzikaTrace.routeName(route)) to=\(MuzikaTrace.routeName(destination))")
-            #endif
             backRoutes.append(route)
             forwardRoutes.removeAll()
             route = destination
@@ -116,9 +110,6 @@ final class AppState {
 
     func togglePanel(_ tab: PlayerPanel) {
         guard playback.current != nil else { return }
-        #if MUZIKA_DEV_LOGS
-        MuzikaTrace.event(.player, "panel.request", "visible=\(showingPlayer) from=\(MuzikaTrace.panelName(panel)) requested=\(MuzikaTrace.panelName(tab)) queue_count=\(playback.queue.count)")
-        #endif
         if showingPlayer {
             panel = panel == tab ? nil : tab
         } else {
@@ -129,18 +120,10 @@ final class AppState {
 
     func showPlayer() {
         guard playback.current != nil else { return }
-        #if MUZIKA_DEV_LOGS
-        MuzikaTrace.event(.player, "player.open.request", "already_visible=\(showingPlayer) panel=\(MuzikaTrace.panelName(panel))")
-        #endif
         showingPlayer = true
     }
 
     func closePlayer() {
-        #if MUZIKA_DEV_LOGS
-        if showingPlayer {
-            MuzikaTrace.event(.player, "player.close.request", "panel=\(MuzikaTrace.panelName(panel))")
-        }
-        #endif
         if showingPlayer { showingPlayer = false }
         if showingInfo { showingInfo = false }
     }

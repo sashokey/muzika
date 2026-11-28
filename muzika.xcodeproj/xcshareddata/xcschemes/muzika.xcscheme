@@ -5,13 +5,13 @@
       <BuildActionEntry buildForTesting="YES" buildForRunning="YES" buildForProfiling="YES" buildForArchiving="YES" buildForAnalyzing="YES"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="000000000000000000000010" BuildableName="MUZIKA?.app" BlueprintName="muzika" ReferencedContainer="container:muzika.xcodeproj"/></BuildActionEntry>
     </BuildActionEntries>
   </BuildAction>
-  <TestAction buildConfiguration="Debug" shouldUseLaunchSchemeArgsEnv="YES"/>
-  <LaunchAction buildConfiguration="Debug" launchStyle="0" useCustomWorkingDirectory="NO">
+  <TestAction buildConfiguration="Release" shouldUseLaunchSchemeArgsEnv="YES"/>
+  <LaunchAction buildConfiguration="Release" launchStyle="0" useCustomWorkingDirectory="NO">
     <BuildableProductRunnable runnableDebuggingMode="0"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="000000000000000000000010" BuildableName="MUZIKA?.app" BlueprintName="muzika" ReferencedContainer="container:muzika.xcodeproj"/></BuildableProductRunnable>
   </LaunchAction>
   <ProfileAction buildConfiguration="Release" shouldUseLaunchSchemeArgsEnv="YES" useCustomWorkingDirectory="NO">
     <BuildableProductRunnable runnableDebuggingMode="0"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="000000000000000000000010" BuildableName="MUZIKA?.app" BlueprintName="muzika" ReferencedContainer="container:muzika.xcodeproj"/></BuildableProductRunnable>
   </ProfileAction>
-  <AnalyzeAction buildConfiguration="Debug"/>
+  <AnalyzeAction buildConfiguration="Release"/>
   <ArchiveAction buildConfiguration="Release" revealArchiveInOrganizer="YES"/>
 </Scheme>

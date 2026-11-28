@@ -52,9 +52,6 @@ final class TimedLyricsScrollView: NSScrollView {
     private var liveScrolling = false
     private var ticker: Timer?
     private var displayLink: CADisplayLink?
-    #if MUZIKA_DEV_LOGS
-    private var progressFrames = MuzikaFrameMetrics()
-    #endif
     private var motion: Motion?
     private var motionID: UInt64 = 0
     private var gapExitID: UUID?
@@ -107,9 +104,6 @@ final class TimedLyricsScrollView: NSScrollView {
         let old = configuration
         configuration = next
         if old?.document != next.document {
-            #if MUZIKA_DEV_LOGS
-            MuzikaTrace.event(.lyrics, "timed.document", "lines=\(next.document.lines.count) size=\(next.textSize) blur=\(next.blur) offset_s=\(next.offset) reduce_motion=\(next.reduceMotion)")
-            #endif
             rowByID = Dictionary(next.document.lines.enumerated().map { ($0.element.id, $0.offset) }, uniquingKeysWith: { first, _ in first })
             layoutTask?.cancel()
             requestedTypography = nil
@@ -185,9 +179,6 @@ final class TimedLyricsScrollView: NSScrollView {
     }
 
     func stop() {
-        #if MUZIKA_DEV_LOGS
-        if displayLink != nil { MuzikaTrace.event(.lyrics, "progress.clock.detached", progressFrames.summary) }
-        #endif
         ticker?.invalidate()
         ticker = nil
         stopMotion(keepingPosition: false)
@@ -226,10 +217,6 @@ final class TimedLyricsScrollView: NSScrollView {
         requestedTypography = typography
         layoutTask?.cancel()
         let lines = configuration.document.lines
-        #if MUZIKA_DEV_LOGS
-        let layoutStarted = CACurrentMediaTime()
-        MuzikaTrace.event(.lyrics, "layout.begin", "lines=\(lines.count) width_pt=\(typography.textWidth) viewport_pt=\(contentSize.height)")
-        #endif
         let job = Task.detached(priority: .userInitiated) {
             var heights: [[CGFloat]] = []
             heights.reserveCapacity(lines.count)
@@ -247,9 +234,6 @@ final class TimedLyricsScrollView: NSScrollView {
                 job.cancel()
             }
             guard !Task.isCancelled, let self, requestedTypography == typography else { return }
-            #if MUZIKA_DEV_LOGS
-            MuzikaTrace.event(.lyrics, "layout.ready", "rows=\(heights.count) elapsed_ms=\(((CACurrentMediaTime() - layoutStarted) * 1000).rounded())")
-            #endif
             measuredTypography = typography
             blockHeights = heights
             clearLayers()
@@ -397,9 +381,6 @@ final class TimedLyricsScrollView: NSScrollView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         if previous != focus {
-            #if MUZIKA_DEV_LOGS
-            MuzikaTrace.event(.lyrics, "cue.changed", "from=\(String(describing: previous)) to=\(String(describing: focus)) time_s=\(now) instrumental=\(activeGap != nil) discontinuity=\(reposition) manual=\(manualUntil != nil || liveScrolling)")
-            #endif
             let precedingGap: Int?
             if case .gap(let index) = previous { precedingGap = index } else { precedingGap = nil }
             let following = manualUntil == nil && !liveScrolling
@@ -442,9 +423,6 @@ final class TimedLyricsScrollView: NSScrollView {
     private func animateGapExit(before index: Int, offsetChange: CGFloat, extent: CGFloat) {
         let id = UUID()
         gapExitID = id
-        #if MUZIKA_DEV_LOGS
-        MuzikaTrace.event(.lyrics, "instrumental.fade.begin", "row=\(index) offset_pt=\(offsetChange) extent_pt=\(extent) duration_s=\(Self.cueDuration)")
-        #endif
         countdown.layer.frame.origin.y += offsetChange
         countdown.layer.opacity = 0
         countdown.layer.add(cueAnimation("opacity", from: 1, to: 0), forKey: Self.countdownFadeKey)
@@ -457,9 +435,6 @@ final class TimedLyricsScrollView: NSScrollView {
         CATransaction.setCompletionBlock { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self, gapExitID == id else { return }
-                #if MUZIKA_DEV_LOGS
-                MuzikaTrace.event(.lyrics, "instrumental.fade.complete")
-                #endif
                 clearGapExit()
             }
         }
@@ -547,9 +522,6 @@ final class TimedLyricsScrollView: NSScrollView {
         motionID &+= 1
         let id = motionID
         motion = Motion(id: id, from: start, to: end, staggered: staggerFrom != nil)
-        #if MUZIKA_DEV_LOGS
-        MuzikaTrace.event(.lyrics, "scroll.animation.begin", "id=\(id) from_pt=\(start) to_pt=\(end) stagger=\(staggerFrom != nil) duration_s=\(staggerFrom == nil ? Self.cueDuration : 0.34)")
-        #endif
         reconcileRows()
 
         let animation = cueAnimation("transform.translation.y", from: 0, to: start - end)
@@ -601,9 +573,6 @@ final class TimedLyricsScrollView: NSScrollView {
     private func stopMotion(keepingPosition: Bool) {
         guard motion != nil else { return }
         let position = contentView.bounds.minY - displayedTranslation
-        #if MUZIKA_DEV_LOGS
-        MuzikaTrace.event(.lyrics, "scroll.animation.stop", "keep_position=\(keepingPosition) presented_pt=\(position)")
-        #endif
         motion = nil
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -614,9 +583,6 @@ final class TimedLyricsScrollView: NSScrollView {
 
     private func finishMotion(id: UInt64) {
         guard let motion, motion.id == id else { return }
-        #if MUZIKA_DEV_LOGS
-        MuzikaTrace.event(.lyrics, "scroll.animation.complete", "id=\(id) target_pt=\(motion.to)")
-        #endif
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         stopMotion(keepingPosition: false)
@@ -641,17 +607,11 @@ final class TimedLyricsScrollView: NSScrollView {
 
     @objc private func beginLiveScroll() {
         liveScrolling = true
-        #if MUZIKA_DEV_LOGS
-        MuzikaTrace.event(.lyrics, "timed.manual.begin", "offset_pt=\(contentView.bounds.minY)")
-        #endif
         holdFollowing()
     }
 
     @objc private func endLiveScroll() {
         liveScrolling = false
-        #if MUZIKA_DEV_LOGS
-        MuzikaTrace.event(.lyrics, "timed.manual.end", "resume_delay_s=\(LyricsScrollTiming.manualHold)")
-        #endif
         holdFollowing()
     }
 
@@ -680,17 +640,10 @@ final class TimedLyricsScrollView: NSScrollView {
         let wantsDisplayLink = attached && (activeGap != nil || fillingRow != nil) &&
             configuration?.playing == true && configuration?.reduceMotion == false
         if wantsDisplayLink, displayLink == nil {
-            #if MUZIKA_DEV_LOGS
-            progressFrames = MuzikaFrameMetrics()
-            MuzikaTrace.event(.lyrics, "progress.clock.start")
-            #endif
             let link = displayLink(target: self, selector: #selector(updatePlaybackProgress))
             displayLink = link
             link.add(to: .main, forMode: .common)
         } else if !wantsDisplayLink {
-            #if MUZIKA_DEV_LOGS
-            if displayLink != nil { MuzikaTrace.event(.lyrics, "progress.clock.stop", progressFrames.summary) }
-            #endif
             displayLink?.invalidate()
             displayLink = nil
         }
@@ -700,9 +653,6 @@ final class TimedLyricsScrollView: NSScrollView {
         updateCue()
         if let manualUntil, !liveScrolling, CACurrentMediaTime() >= manualUntil {
             self.manualUntil = nil
-            #if MUZIKA_DEV_LOGS
-            MuzikaTrace.event(.lyrics, "timed.manual.resume")
-            #endif
             center(animated: configuration?.reduceMotion == false)
         }
         updateClocks()
@@ -710,10 +660,6 @@ final class TimedLyricsScrollView: NSScrollView {
 
     @objc private func updatePlaybackProgress() {
         let now = audioTime
-        #if MUZIKA_DEV_LOGS
-        progressFrames.record(at: CACurrentMediaTime(), position: now)
-        progressFrames.reportIfReady(.lyrics, "progress.frames")
-        #endif
         if let gap = activeGap {
             countdown.setProgress((now - gap.start) / (gap.end - gap.start))
         }
@@ -752,9 +698,6 @@ final class TimedLyricsScrollView: NSScrollView {
         let offset = configuration.offset.isFinite ? configuration.offset : 0
         manualUntil = nil
         liveScrolling = false
-        #if MUZIKA_DEV_LOGS
-        MuzikaTrace.event(.lyrics, "seek.row", "row=\(row) target_s=\(max(0, start + offset))")
-        #endif
         configuration.seek(max(0, start + offset))
         updateCue(force: true, at: start)
         if focus == .row(row) { center(animated: !configuration.reduceMotion) }

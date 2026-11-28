@@ -2,15 +2,14 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
-report="${1:?Usage: bash Tests/Performance/run.sh ABSOLUTE_REPORT.json [repeats] [ABSOLUTE_TRACE.trace] [suite|home|compositor|stress|stress-compositor]}"
+report="${1:?Usage: bash Tests/Performance/run.sh ABSOLUTE_REPORT.json [repeats] [suite|home|stress]}"
 repeats="${2:-3}"
-trace="${3:-}"
-mode="${4:-suite}"
-case "$mode" in suite|home|compositor|stress|stress-compositor) ;; *) printf '%s\n' "Unknown performance mode: $mode" >&2; exit 2 ;; esac
-if [[ "$mode" != suite && -z "$trace" ]]; then
-    printf '%s\n' "$mode verification requires an Instruments trace." >&2
-    exit 2
-fi
+mode="${3:-suite}"
+case "$mode" in
+    suite) ;;
+    home|stress) export MUZIKA_PERFORMANCE_VISIBLE=1 ;;
+    *) printf '%s\n' "Unknown test mode: $mode" >&2; exit 2 ;;
+esac
 case "$report" in /*) ;; *) printf '%s\n' "The report path must be absolute." >&2; exit 2 ;; esac
 scratch="$(mktemp -d /tmp/muzika-performance.XXXXXXXX)"
 python3 - "$root/muzika" "$scratch" "$mode" <<'PY'
@@ -20,7 +19,7 @@ import sys
 
 source = Path(sys.argv[1])
 sandbox = Path(sys.argv[2])
-stress = sys.argv[3] in {"stress", "stress-compositor"}
+stress = sys.argv[3] == "stress"
 
 def replace(text, before, after):
     if before not in text:
@@ -46,11 +45,6 @@ for file in source.rglob("*.swift"):
     elif file.name == "LibraryShell.swift" and stress:
         text = replace(text, 'private var searchQuery = ""', 'private var searchQuery = "Stress Track"')
         text = replace(text, "private var searchScope = BrowseSearchScope.all", "private var searchScope = BrowseSearchScope.songs")
-    elif file.name == "WaveBackground.swift":
-        before = "        buffer.addCompletedHandler { [weak self] completed in\n"
-        text = replace(text, before, before + "            PerformanceGPU.record(completed)\n")
-        present = "        frame.drawable.present()\n"
-        text = replace(text, present, "        PerformanceGPU.observe(frame.drawable)\n" + present)
     target = sandbox / file.relative_to(source)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(text)
@@ -62,10 +56,8 @@ xcrun swiftc -O -parse-as-library -swift-version 6 -target arm64-apple-macosx27.
     -Xfrontend -disable-sandbox -module-cache-path "${MUZIKA_PERFORMANCE_MODULE_CACHE:-$scratch/module-cache}" \
     "$root/Tests/Performance/PerformanceProbe.swift" "$root/Tests/Performance/HomeScrollCheck.swift" \
     "$root/Tests/Performance/StressScrollCheck.swift" "${files[@]}" -o "$scratch/MuzikaPerformance"
-printf 'Fixture: %s\n' "$scratch"
-if [[ "${MUZIKA_PERFORMANCE_BUILD_ONLY:-0}" == 1 ]]; then exit 0; fi
-if [[ -n "$trace" ]]; then
-    bash "$root/Tests/Performance/record-trace.sh" "$scratch" "$report" "$repeats" "$trace" "$mode"
-else
-    "$scratch/MuzikaPerformance" "$scratch" "$report" "$repeats"
+if [[ "${MUZIKA_PERFORMANCE_BUILD_ONLY:-0}" == 1 ]]; then
+    printf '%s\n' "$scratch"
+    exit 0
 fi
+"$scratch/MuzikaPerformance" "$scratch" "$report" "$repeats" "$mode"

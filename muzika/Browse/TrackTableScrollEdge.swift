@@ -55,9 +55,6 @@ private struct BrowseNativeScrollEdge: NSViewRepresentable {
         private var originalRowHeight: CGFloat?
         private var uniformRowHeight: CGFloat?
         private var rowSizingPending = false
-        #if MUZIKA_DEV_LOGS
-        private weak var tracedTable: NSTableView?
-        #endif
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
@@ -95,9 +92,6 @@ private struct BrowseNativeScrollEdge: NSViewRepresentable {
                 return
             }
             guard let table = scroll.documentView as? NSTableView else { return }
-            #if MUZIKA_DEV_LOGS
-            observeSelection(in: table)
-            #endif
             updateRowSizing(for: table)
             guard enabled, let header = table.headerView, header.window === window else {
                 for mask in masks.values { mask.restore() }
@@ -142,30 +136,8 @@ private struct BrowseNativeScrollEdge: NSViewRepresentable {
             for mask in masks.values { mask.restore() }
             masks.removeAll()
             scroll = nil
-            #if MUZIKA_DEV_LOGS
-            NotificationCenter.default.removeObserver(self, name: NSTableView.selectionDidChangeNotification, object: tracedTable)
-            tracedTable = nil
-            #endif
         }
 
-        #if MUZIKA_DEV_LOGS
-        private func observeSelection(in table: NSTableView) {
-            guard tracedTable !== table else { return }
-            let center = NotificationCenter.default
-            center.removeObserver(self, name: NSTableView.selectionDidChangeNotification, object: tracedTable)
-            tracedTable = table
-            center.addObserver(self, selector: #selector(selectionChanged(_:)),
-                name: NSTableView.selectionDidChangeNotification, object: table)
-        }
-
-        @objc private func selectionChanged(_ notification: Notification) {
-            guard let table = notification.object as? NSTableView else { return }
-            let row = table.selectedRow >= 0 ? table.selectedRow : 0
-            let height = table.numberOfRows > row ? table.rect(ofRow: row).height : 0
-            MuzikaTrace.event(.library, "table.selection",
-                "selected=\(table.numberOfSelectedRows) row=\(row) measured_pt=\(height) native_height_pt=\(table.rowHeight) automatic=\(table.usesAutomaticRowHeights)")
-        }
-        #endif
 
         private func updateRowSizing(for table: NSTableView) {
             if sizedTable !== table { forgetRowSizing() }
@@ -207,12 +179,6 @@ private struct BrowseNativeScrollEdge: NSViewRepresentable {
                 uniformRowHeight = height
                 sizedTable = table
             }
-            #if MUZIKA_DEV_LOGS
-            if table.rowHeight != height || table.usesAutomaticRowHeights {
-                MuzikaTrace.event(.library, "table.uniform-height",
-                    "before_pt=\(table.rowHeight) fixed_pt=\(height) spacing_pt=\(table.intercellSpacing.height) rows=\(table.numberOfRows)")
-            }
-            #endif
             if table.rowHeight != height { table.rowHeight = height }
             if table.usesAutomaticRowHeights { table.usesAutomaticRowHeights = false }
         }

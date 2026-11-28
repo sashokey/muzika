@@ -60,9 +60,6 @@ struct BrowseHeaderMenus: View {
     }
 
     private func select(_ id: BrowseHeaderMenu.ID) {
-        #if MUZIKA_DEV_LOGS
-        MuzikaTrace.event(.library, "menu.switch", "from=\(String(describing: selection)) selected=\(id) closes=\(selection == id)")
-        #endif
         selection = selection == id ? nil : id
     }
 }

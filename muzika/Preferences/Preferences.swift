@@ -206,12 +206,6 @@ enum AutoScan: String, CaseIterable, Identifiable {
         case .weekly: 604_800
         }
     }
-
-    func due(last: Date?, now: Date) -> Bool {
-        guard self != .opening else { return true }
-        guard let interval else { return false }
-        return last.map { now.timeIntervalSince($0) >= interval } ?? true
-    }
 }
 
 enum CoverStyle: String, CaseIterable, Identifiable {

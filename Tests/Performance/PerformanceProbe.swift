@@ -4,55 +4,9 @@ import CoreImage
 import Darwin
 import Foundation
 import Metal
-import OSLog
 import QuartzCore
 import ScreenCaptureKit
 import SwiftUI
-import Synchronization
-
-struct GPUSlice: Sendable {
-    let start: Double
-    let end: Double
-}
-
-enum PerformanceGPU {
-    private static let slices = Mutex<[GPUSlice]>([])
-    private static let presentations = Mutex<[Double]>([])
-
-    static func observe(_ drawable: any MTLDrawable) {
-        drawable.addPresentedHandler { drawable in
-            if drawable.presentedTime > 0 {
-                presentations.withLock { $0.append(drawable.presentedTime) }
-            }
-        }
-    }
-
-    static func presentedFrames(from lower: Double, to upper: Double) -> [Double] {
-        presentations.withLock { times in
-            let measured = times.filter { $0 >= lower && $0 <= upper }.sorted()
-            times.removeAll { $0 <= upper }
-            return measured
-        }
-    }
-
-    static func record(_ buffer: any MTLCommandBuffer) {
-        let start = buffer.gpuStartTime
-        let end = buffer.gpuEndTime
-        guard start > 0, end > start else { return }
-        slices.withLock { $0.append(GPUSlice(start: start, end: end)) }
-    }
-
-    static func milliseconds(from lower: Double, to upper: Double) -> Double? {
-        slices.withLock { slices in
-            let durations = slices.compactMap { slice -> Double? in
-                let overlap = min(upper, slice.end) - max(lower, slice.start)
-                return overlap > 0 ? overlap * 1000 : nil
-            }
-            slices.removeAll { $0.end <= upper }
-            return durations.isEmpty ? nil : durations.reduce(0, +)
-        }
-    }
-}
 
 final class BenchmarkDefaults: UserDefaults, @unchecked Sendable {
     override func object(forKey defaultName: String) -> Any? { nil }
@@ -80,57 +34,14 @@ private final class PerformanceWindow: NSWindow {
     override var canBecomeMain: Bool { false }
 }
 
-private struct BenchmarkSample: Codable {
+private struct ScenarioResult: Encodable {
     let action: String
     let iteration: Int
-    let actionWallMilliseconds: Double
-    let sampledWallMilliseconds: Double
-    let cpuMilliseconds: Double
-    let appMetalMilliseconds: Double?
-    let ramBeforeMiB: Double
-    let ramAfterMiB: Double
-    let sampledPeakRAMMiB: Double
-    let windowVisible: Bool
-    let displayMaximumHz: Int
-    let lowPowerMode: Bool
-    let macOS: String
-    let playbackMode: String
-    let metalPresentedFrames: Int
-    let metalFrameIntervalP95Milliseconds: Double?
-
-    enum CodingKeys: String, CodingKey {
-        case action, iteration, actionWallMilliseconds, sampledWallMilliseconds
-        case cpuMilliseconds, appMetalMilliseconds, ramBeforeMiB, ramAfterMiB, sampledPeakRAMMiB
-        case windowVisible, displayMaximumHz, lowPowerMode, macOS, playbackMode
-        case metalPresentedFrames, metalFrameIntervalP95Milliseconds
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var data = encoder.container(keyedBy: CodingKeys.self)
-        try data.encode(action, forKey: .action)
-        try data.encode(iteration, forKey: .iteration)
-        try data.encode(actionWallMilliseconds, forKey: .actionWallMilliseconds)
-        try data.encode(sampledWallMilliseconds, forKey: .sampledWallMilliseconds)
-        try data.encode(cpuMilliseconds, forKey: .cpuMilliseconds)
-        try data.encode(appMetalMilliseconds, forKey: .appMetalMilliseconds)
-        try data.encode(ramBeforeMiB, forKey: .ramBeforeMiB)
-        try data.encode(ramAfterMiB, forKey: .ramAfterMiB)
-        try data.encode(sampledPeakRAMMiB, forKey: .sampledPeakRAMMiB)
-        try data.encode(windowVisible, forKey: .windowVisible)
-        try data.encode(displayMaximumHz, forKey: .displayMaximumHz)
-        try data.encode(lowPowerMode, forKey: .lowPowerMode)
-        try data.encode(macOS, forKey: .macOS)
-        try data.encode(playbackMode, forKey: .playbackMode)
-        try data.encode(metalPresentedFrames, forKey: .metalPresentedFrames)
-        try data.encode(metalFrameIntervalP95Milliseconds, forKey: .metalFrameIntervalP95Milliseconds)
-    }
 }
 
 @main
 @MainActor
 enum PerformanceProbe {
-    private static let signposts = OSSignposter(logHandle: OSLog(subsystem: "org.muzika.performance", category: .pointsOfInterest))
-
     static func main() async throws {
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
@@ -154,7 +65,7 @@ enum PerformanceProbe {
         let report = URL(filePath: CommandLine.arguments[2])
         let repetitions = max(1, Int(CommandLine.arguments[3]) ?? 3)
         let mode = CommandLine.arguments.dropFirst(4).first ?? "suite"
-        let stress = mode == "stress" || mode == "stress-compositor"
+        let stress = mode == "stress"
         var actions: [Action]
         if mode == "home" {
             actions = [
@@ -173,20 +84,20 @@ enum PerformanceProbe {
                 throw HomeScrollCheck.Failure("Invalid performance action selection")
             }
         }
-        var results: [BenchmarkSample] = []
+        var results: [ScenarioResult] = []
         for iteration in 1...repetitions {
             let fixture = try Fixture(stress: stress)
             try await Task.sleep(for: .milliseconds(showsWindow ? 500 : 150))
             fixture.host.layoutSubtreeIfNeeded()
             try await fixture.waitForVisibility()
             for action in actions {
-                results.append(try await measure(action, iteration: iteration, fixture: fixture))
+                try await run(action, in: fixture)
+                results.append(ScenarioResult(action: action.name, iteration: iteration))
             }
         }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try encoder.encode(results).write(to: report, options: .atomic)
-        print("\(actions.count) actions × \(repetitions) repeats, \(results.filter { $0.appMetalMilliseconds != nil }.count) samples with timed Metal commands")
     }
 
     private static var showsWindow: Bool {
@@ -197,70 +108,21 @@ enum PerformanceProbe {
         ProcessInfo.processInfo.environment["MUZIKA_TEST_WRAPPED_LYRICS"] == "1"
     }
 
-    private static func measure(_ action: Action, iteration: Int, fixture: Fixture) async throws -> BenchmarkSample {
+    private static func run(_ action: Action, in fixture: Fixture) async throws {
         try fixture.checkVisibility()
-        let playbackMode = fixture.state.playback.playing ? "offline" : "idle"
-        let interval = signposts.beginInterval("Action", id: signposts.makeSignpostID(), "\(action.name, privacy: .public)")
-        defer { signposts.endInterval("Action", interval) }
-
-        let clock = ContinuousClock()
-        let started = clock.now
-        let gpuStart = CACurrentMediaTime()
-        let cpuStart = clock_gettime_nsec_np(CLOCK_PROCESS_CPUTIME_ID)
-        let memoryBefore = try footprint()
-        var memoryPeak = memoryBefore
-
         do {
             try await action.run(fixture)
         } catch {
             throw HomeScrollCheck.Failure("\(action.name): \(error)")
         }
         fixture.host.layoutSubtreeIfNeeded()
-        let work = milliseconds(started.duration(to: clock.now))
         if !action.name.hasPrefix("home.shuffle_scroll_") {
             for _ in 0..<5 {
                 try await Task.sleep(for: .milliseconds(45))
                 fixture.host.layoutSubtreeIfNeeded()
-                memoryPeak = max(memoryPeak, try footprint())
             }
         }
         try fixture.checkVisibility()
-        let memoryAfter = try footprint()
-        let cpu = Double(clock_gettime_nsec_np(CLOCK_PROCESS_CPUTIME_ID) - cpuStart) / 1_000_000
-        let frameEnd = CACurrentMediaTime()
-        let gpu = PerformanceGPU.milliseconds(from: gpuStart, to: frameEnd)
-        let frames = PerformanceGPU.presentedFrames(from: gpuStart, to: frameEnd)
-        let intervals = zip(frames, frames.dropFirst()).map { ($1 - $0) * 1_000 }.sorted()
-        let p95 = intervals.isEmpty ? nil : intervals[Int(ceil(Double(intervals.count) * 0.95)) - 1]
-        return BenchmarkSample(
-            action: action.name, iteration: iteration, actionWallMilliseconds: work,
-            sampledWallMilliseconds: milliseconds(started.duration(to: clock.now)),
-            cpuMilliseconds: cpu, appMetalMilliseconds: gpu,
-            ramBeforeMiB: memoryBefore, ramAfterMiB: memoryAfter, sampledPeakRAMMiB: max(memoryPeak, memoryAfter),
-            windowVisible: fixture.window.occlusionState.contains(.visible),
-            displayMaximumHz: fixture.window.screen?.maximumFramesPerSecond ?? 0,
-            lowPowerMode: ProcessInfo.processInfo.isLowPowerModeEnabled,
-            macOS: ProcessInfo.processInfo.operatingSystemVersionString,
-            playbackMode: playbackMode, metalPresentedFrames: frames.count, metalFrameIntervalP95Milliseconds: p95
-        )
-    }
-
-    private static func milliseconds(_ duration: Duration) -> Double {
-        let parts = duration.components
-        return Double(parts.seconds) * 1000 + Double(parts.attoseconds) / 1e15
-    }
-
-    private static func footprint() throws -> Double {
-        var info = task_vm_info_data_t()
-        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.stride / MemoryLayout<integer_t>.stride)
-        let capacity = Int(count)
-        let result = withUnsafeMutablePointer(to: &info) { pointer in
-            pointer.withMemoryRebound(to: integer_t.self, capacity: capacity) {
-                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
-            }
-        }
-        guard result == KERN_SUCCESS else { throw CocoaError(.fileReadUnknown) }
-        return Double(info.phys_footprint) / 1_048_576
     }
 
     private struct Action {
@@ -413,13 +275,22 @@ enum PerformanceProbe {
             Action("navigation.back") { $0.state.back() },
             Action("navigation.forward") { $0.state.forward() },
             Action("search.query") { fixture in
-                fixture.consume(fixture.groupIndex.tracksMatching("édition 1", in: fixture.state.library))
+                let matches = fixture.groupIndex.tracksMatching("édition 1", in: fixture.state.library)
+                guard matches.contains(where: { $0.title == "Track 1 Édition" }) else {
+                    throw HomeScrollCheck.Failure("Search did not find Track 1 Édition")
+                }
             },
-            Action("sort.duration") { $0.consume(BrowseSort.duration.sorted($0.state.library.tracks)) },
-            Action("sort.duration_reverse") { $0.consume(BrowseSort.duration.sorted($0.state.library.tracks, descending: true)) },
+            Action("sort.duration") {
+                try verifyDurationSort($0.state.library.tracks, descending: false)
+            },
+            Action("sort.duration_reverse") {
+                try verifyDurationSort($0.state.library.tracks, descending: true)
+            },
             Action("filter.metadata") { fixture in
                 let tracks = fixture.state.library.tracks
-                fixture.consume(tracks.filter { !$0.artist.isEmpty && !$0.album.isEmpty })
+                guard tracks.filter({ !$0.artist.isEmpty && !$0.album.isEmpty }).count == 1_590 else {
+                    throw HomeScrollCheck.Failure("Fixture metadata is missing")
+                }
             },
             Action("queue.add") { $0.state.playback.addToQueue($0.media, next: false) },
             Action("queue.play_next") { $0.state.playback.addToQueue([$0.media[0]], next: true) },
@@ -486,18 +357,31 @@ enum PerformanceProbe {
             Action("player.close") { $0.state.closePlayer() },
             Action("lyrics.lookup") { fixture in
                 let document = try await fixture.state.library.lyrics(for: fixture.media[0])
-                fixture.checksum = document?.activeLine(at: 0.6)?.id ?? -1
+                guard document?.activeLine(at: 0.6)?.text == "Fixture lyric line 2" else {
+                    throw HomeScrollCheck.Failure("Lyrics lookup returned the wrong active line")
+                }
             },
             Action("artwork.decode") { fixture in
                 let image = try Data(contentsOf: fixture.artwork)
                 let cover = await CoverDecoding.image(image, limit: 480)
-                fixture.checksum = cover?.width ?? -1
+                guard cover?.width == 320, cover?.height == 320 else {
+                    throw HomeScrollCheck.Failure("Artwork did not decode at its original size")
+                }
             },
             Action("waves.frame") { try $0.renderWave() },
             Action("library.scan") { await $0.state.library.addSource($0.importFolder) },
             Action("cache.artwork_clear") { $0.state.library.clearArtworkCache() },
             Action("playback.dismiss") { $0.state.dismissPlayback() },
         ]
+    }
+
+    private static func verifyDurationSort(_ tracks: [AudioTrack], descending: Bool) throws {
+        let sorted = BrowseSort.duration.sorted(tracks, descending: descending).map(\.duration)
+        let durations = tracks.map(\.duration)
+        let expected = descending ? durations.sorted(by: >) : durations.sorted()
+        guard sorted == expected else {
+            throw HomeScrollCheck.Failure("Track durations are out of order")
+        }
     }
 
     private final class HoverCheckWindow: NSWindow {
@@ -748,13 +632,11 @@ enum PerformanceProbe {
         let glyph = resting.indices.filter { shown[$0] - resting[$0] > 0.23 }
         guard glyph.count >= 6 else { throw HomeScrollCheck.Failure("Play did not appear in the captured window") }
         let scale = glyph.reduce(0) { $0 + shown[$1] - resting[$1] }
-        let transitions = [("enter row at artwork", entering), ("leave artwork for title", leavingArtwork),
-                           ("enter artwork from title", reentering), ("leave row", leavingRow)]
+        let transitions = [entering, leavingArtwork, reentering, leavingRow]
         var allAnimated = true
-        for (name, frames) in transitions {
+        for frames in transitions {
             let progress = frames.map { frame in glyph.reduce(0) { $0 + frame[$1] - resting[$1] } / scale }
             let intermediate = progress.filter { (0.14...0.86).contains($0) }.count
-            print("Genres \(name): \(progress.map { Int(($0 * 100).rounded()) })")
             allAnimated = allAnimated && intermediate >= 2
         }
         guard allAnimated else { throw HomeScrollCheck.Failure("A presented Play transition skipped its intermediate frames") }
@@ -903,7 +785,6 @@ enum PerformanceProbe {
         let artwork: URL
         let rootFolder: URL
         let largeGroupRoutes: [String: LibraryRoute]
-        var checksum = 0
 
         init(stress: Bool) throws {
             let manager = FileManager.default
@@ -1036,8 +917,6 @@ enum PerformanceProbe {
             }
         }
 
-        func consume(_ tracks: [AudioTrack]) { checksum = tracks.first?.id.hashValue ?? tracks.count }
-
         func scrollLargePage(_ name: String) async throws {
             let scroll = try await StressScrollCheck.longScroll(in: host, name: name)
             try await StressScrollCheck.scroll(scroll, name: name)
@@ -1114,7 +993,6 @@ enum PerformanceProbe {
             buffer.commit()
             buffer.waitUntilCompleted()
             guard buffer.status == .completed else { throw CocoaError(.fileReadUnknown) }
-            PerformanceGPU.record(buffer)
         }
 
 
