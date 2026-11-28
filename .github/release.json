@@ -1,6 +1,6 @@
 {
-  "version": "v18",
+  "version": "v19",
   "draft": false,
   "prerelease": false,
-  "notes": "- Enabled buttons now show a pointing-hand cursor on hover, including playback controls and library cards. [#5](https://github.com/sashokey/muzika/issues/5)\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
+  "notes": "- **Done** in track info uses the same hover animation as **Play** in **Songs**.\n- Enabled navigation rows in the library and **Settings** sidebars show a pointing-hand cursor. [#5](https://github.com/sashokey/muzika/issues/5)\n\nRequires macOS 27 or later on Apple silicon. The app archive is ad-hoc signed."
 }

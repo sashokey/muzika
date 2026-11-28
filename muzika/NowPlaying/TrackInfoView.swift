@@ -56,7 +56,7 @@ struct TrackInfoView: View {
                 Spacer()
                 Button("Done") { dismiss() }
                     .keyboardShortcut(.defaultAction)
-                    .buttonStyle(GlassHoverButtonStyle(prominent: true))
+                    .buttonStyle(GlassHoverButtonStyle.accent())
             }
         }
         .padding(20)
